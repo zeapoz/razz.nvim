@@ -132,20 +132,41 @@ function M.open_note(opts)
         local current_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
         local current_content = to_export_content(current_lines)
 
-        if current_content == original_content then
-          vim.notify("No changes to note: " .. note_addr)
-          vim.bo[buf].modified = false
+        local normalized_content = current_content:gsub("\\r", "\r"):gsub("\\n", "\n")
+
+        local server_notes = razz.get_server_notes(game_id)
+        local server_note_content = nil
+        for _, sn in ipairs(server_notes) do
+          if sn.Address:lower() == note_addr:lower() then
+            server_note_content = sn.Note
+            break
+          end
         end
 
         local export_note = { Address = note_addr, Note = current_content }
-        local ok, err = razz.export_note(game_id, export_note)
-        if ok then
-          vim.notify("Exported note: " .. note_addr)
-          original_content = current_content
-          vim.bo[buf].modified = false
+
+        if server_note_content and normalized_content == server_note_content then
+          local ok, err = razz.delete_local_note(game_id, note_addr)
+          if ok then
+            vim.notify("Note matches server, removed local: " .. note_addr)
+          else
+            vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
+          end
         else
-          vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
+          local ok, err = razz.export_note(game_id, export_note)
+          if ok then
+            if server_note_content then
+              vim.notify("Updated note: " .. note_addr)
+            else
+              vim.notify("Added new note: " .. note_addr)
+            end
+          else
+            vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
+          end
         end
+
+        original_content = current_content
+        vim.bo[buf].modified = false
       end,
     })
 
