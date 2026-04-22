@@ -10,11 +10,22 @@ function M.show_notes(opts)
   local razz = require("razz")
   local game_id = opts.game_id
   local on_select = opts.on_select
+  local notes = opts.notes
 
-  local notes = razz.get_notes(game_id)
+  if not notes then
+    if not game_id then
+      vim.notify("show_notes requires either notes or game_id", vim.log.levels.ERROR)
+      return
+    end
+    notes = razz.get_notes(game_id)
+  end
 
   if #notes == 0 then
-    vim.notify("No notes found for game " .. game_id, vim.log.levels.WARN)
+    if game_id then
+      vim.notify("No notes found for game " .. game_id, vim.log.levels.WARN)
+    else
+      vim.notify("No notes found", vim.log.levels.WARN)
+    end
     return
   end
 
@@ -27,8 +38,10 @@ function M.show_notes(opts)
   local entry_maker = function(note)
     local normalized = note.Note:gsub("\r\n", "\n")
     local first_line = normalized:match("^[^\n]*")
-    local display = note.Address .. ": " .. first_line
+    local prefix = note.User == "Local Note" and "*" or ""
+    local display = note.Address .. ": " .. prefix .. first_line
     local ordinal = note.Address .. " " .. note.User .. " " .. first_line
+
     return {
       value = note,
       display = display,
@@ -81,12 +94,21 @@ end
 function M.open_note(opts)
   local razz = require("razz")
   local game_id = opts.game_id
+  local get_notes_fn = opts.get_notes_fn
+
+  local notes
+  if get_notes_fn then
+    notes = get_notes_fn(game_id)
+  else
+    notes = razz.get_notes(game_id)
+  end
+
+  opts.notes = notes
 
   opts.on_select = function(note)
     local prev_winnr = vim.api.nvim_get_current_win()
     local note_addr = note.Address
     local buf = vim.api.nvim_create_buf(true, "")
-    vim.bo[buf].buftype = ""
     vim.bo[buf].fileformat = "dos"
     local lines = vim.split(note.Note, "\r\n", false, { keepempty = true })
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -113,7 +135,6 @@ function M.open_note(opts)
         if current_content == original_content then
           vim.notify("No changes to note: " .. note_addr)
           vim.bo[buf].modified = false
-          return 1
         end
 
         local export_note = { Address = note_addr, Note = current_content }
@@ -125,9 +146,10 @@ function M.open_note(opts)
         else
           vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
         end
-        return 1
       end,
     })
+
+    vim.bo[buf].buftype = "acwrite"
 
     vim.api.nvim_create_autocmd("BufUnload", {
       buffer = buf,

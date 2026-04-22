@@ -19,7 +19,7 @@ function M.get_data_paths()
   return paths
 end
 
-function M.get_notes(game_id)
+function M.load_server_notes(game_id)
   if #M.config.emulator_dirs == 0 then
     return {}
   end
@@ -38,6 +38,79 @@ function M.get_notes(game_id)
   end
 
   return notes or {}
+end
+
+function M.load_local_notes(game_id)
+  if #M.config.emulator_dirs == 0 then
+    return {}
+  end
+
+  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
+  local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
+
+  local ok, _ = vim.fn.filereadable(user_file)
+  if ok == 0 then
+    return {}
+  end
+
+  local lines = vim.fn.readfile(user_file)
+  local notes = {}
+
+  for i = 3, #lines do
+    local line = lines[i]
+    local addr, note = line:match('^N0:(0x[%x]+):"(.*)"')
+    if addr and note then
+      note = note:gsub("\\r", "\r"):gsub("\\n", "\n")
+      local num_part = addr:sub(3):gsub("^0+", "")
+      if num_part == "" then num_part = "0" end
+      addr = "0x" .. num_part
+      table.insert(notes, {
+        Address = addr:lower(),
+        Note = note,
+        User = "Local Note",
+      })
+    end
+  end
+
+  return notes
+end
+
+function M.get_server_notes(game_id)
+  return M.load_server_notes(game_id)
+end
+
+function M.get_local_notes(game_id)
+  return M.load_local_notes(game_id)
+end
+
+function M.get_notes(game_id)
+  local server_notes = M.load_server_notes(game_id)
+  local local_notes = M.load_local_notes(game_id)
+
+  local local_by_addr = {}
+  for _, note in ipairs(local_notes) do
+    local_by_addr[note.Address:lower()] = note
+  end
+
+  local results = {}
+  local used_local = {}
+
+  for _, note in ipairs(server_notes) do
+    if local_by_addr[note.Address:lower()] then
+      table.insert(results, local_by_addr[note.Address:lower()])
+      used_local[note.Address:lower()] = true
+    else
+      table.insert(results, note)
+    end
+  end
+
+  for _, note in ipairs(local_notes) do
+    if not used_local[note.Address:lower()] then
+      table.insert(results, note)
+    end
+  end
+
+  return results
 end
 
 function M.get_current_game_id()
@@ -86,6 +159,48 @@ function M.export_note(game_id, note)
     return false, "no emulator_dirs configured"
   end
 
+  return M._write_user_note(game_id, note, true)
+end
+
+function M.delete_local_note(game_id, address)
+  if #M.config.emulator_dirs == 0 then
+    return false, "no emulator_dirs configured"
+  end
+
+  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
+  local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
+
+  local ok, _ = vim.fn.filereadable(user_file)
+  if ok == 0 then
+    return false, "file not found: " .. user_file
+  end
+
+  local lines = vim.fn.readfile(user_file)
+  local addr_num = tonumber(address, 16)
+  local new_lines = {}
+
+  for i = 1, #lines do
+    if i < 3 then
+      table.insert(new_lines, lines[i])
+    else
+      local line = lines[i]
+      local addr = line:match("^N0:(0x[%x]+):")
+      if addr then
+        local existing_addr_num = tonumber(addr, 16)
+        if existing_addr_num ~= addr_num then
+          table.insert(new_lines, line)
+        end
+      else
+        table.insert(new_lines, line)
+      end
+    end
+  end
+
+  vim.fn.writefile(new_lines, user_file)
+  return true
+end
+
+function M._write_user_note(game_id, note, keep_if_same)
   local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
   local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
 
