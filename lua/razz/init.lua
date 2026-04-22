@@ -40,8 +40,24 @@ function M.get_notes(game_id)
   return notes or {}
 end
 
-function M.show_notes_picker(game_id)
-  M.picker.show_notes_picker(game_id)
+function M.get_current_game_id()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, 2, false)
+  if #lines < 2 then
+    return nil
+  end
+  local id = lines[2]:match("#ID%s*=%s*(%d+)")
+  return id
+end
+
+function M.show_notes(game_id)
+  if not game_id then
+    game_id = M.get_current_game_id()
+    if not game_id then
+      vim.notify("Could not detect game ID from current buffer", vim.log.levels.ERROR)
+      return
+    end
+  end
+  M.picker.show_notes(game_id)
 end
 
 return M

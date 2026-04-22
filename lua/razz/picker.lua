@@ -1,6 +1,6 @@
 local M = {}
 
-function M.show_notes_picker(game_id)
+function M.show_notes(game_id)
   local ok, telescope = pcall(require, "telescope")
   if not ok then
     vim.notify("telescope not installed", vim.log.levels.ERROR)
