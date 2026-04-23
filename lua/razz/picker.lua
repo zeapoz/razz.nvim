@@ -2,99 +2,6 @@ local M = {}
 local constants = require("razz.constants")
 local helpers = require("razz.helpers")
 
-function M.show_notes(opts)
-  local ok, _ = pcall(require, "telescope")
-  if not ok then
-    vim.notify("telescope not installed", vim.log.levels.ERROR)
-    return
-  end
-
-  local razz = opts.razz or require("razz")
-  local game_id = opts.game_id
-  local on_select = opts.on_select
-  local notes = opts.notes
-
-  if not notes then
-    if not game_id then
-      vim.notify("show_notes requires either notes or game_id", vim.log.levels.ERROR)
-      return
-    end
-    notes = razz.get_notes(game_id)
-  end
-
-  if #notes == 0 then
-    if game_id then
-      vim.notify("No notes found for game " .. game_id, vim.log.levels.WARN)
-    else
-      vim.notify("No notes found", vim.log.levels.WARN)
-    end
-    return
-  end
-
-  local pickers = require("telescope.pickers")
-  local finders = require("telescope.finders")
-  local previewers = require("telescope.previewers")
-  local actions = require("telescope.actions")
-  local action_state = require("telescope.actions.state")
-
-  local entry_maker = function(note)
-    local normalized = helpers._normalize_for_display(note.Note)
-    local first_line = normalized:match("^[^\n]*")
-    local prefix = note.User == constants.LOCAL_USER_LABEL and "*" or ""
-    local display = note.Address .. ": " .. prefix .. first_line
-    local ordinal = note.Address .. " " .. note.User .. " " .. first_line
-
-    return {
-      value = note,
-      display = display,
-      ordinal = ordinal,
-    }
-  end
-
-  local previewer = previewers.new_buffer_previewer({
-    define_preview = function(self, entry, _)
-      local note = entry.value
-      local normalized = helpers._normalize_for_display(note.Note)
-      local lines = {
-        "Address: " .. note.Address,
-        "User: " .. note.User,
-        "",
-      }
-      vim.list_extend(lines, vim.split(normalized, "\n"))
-      vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
-    end,
-  })
-
-  local picker_opts = {
-    prompt_title = "Notes for " .. game_id,
-    finder = finders.new_table({
-      results = notes,
-      entry_maker = entry_maker,
-    }),
-    previewer = previewer,
-    sorter = require("telescope.sorters").get_generic_fuzzy_sorter(),
-    sorting_strategy = "ascending",
-  }
-
-  if on_select then
-    picker_opts.attach_mappings = function(prompt_bufnr)
-      actions.select_default:replace(function()
-        local picker = action_state.get_current_picker(prompt_bufnr)
-        local multiselect = picker:get_multi_selection()
-        local selection = action_state.get_selected_entry()
-        if selection then
-          actions.close(prompt_bufnr)
-          local selections = #multiselect > 0 and multiselect or { selection }
-          on_select(selection, selections)
-        end
-      end)
-      return true
-    end
-  end
-
-  pickers.new({}, picker_opts):find()
-end
-
 local function open_note_buffer(note, game_id, prev_winnr, focus)
   local note_addr = note.Address
   local buf = vim.api.nvim_create_buf(true, false)
@@ -171,6 +78,116 @@ local function open_note_buffer(note, game_id, prev_winnr, focus)
   return buf
 end
 
+function M.show_notes(opts)
+  local ok, _ = pcall(require, "telescope")
+  if not ok then
+    vim.notify("telescope not installed", vim.log.levels.ERROR)
+    return
+  end
+
+  local razz = opts.razz or require("razz")
+  local game_id = opts.game_id
+  local on_select = opts.on_select
+  local notes = opts.notes
+
+  if not notes then
+    if not game_id then
+      vim.notify("show_notes requires either notes or game_id", vim.log.levels.ERROR)
+      return
+    end
+    notes = razz.get_notes(game_id)
+  end
+
+  if #notes == 0 then
+    if game_id then
+      vim.notify("No notes found for game " .. game_id, vim.log.levels.WARN)
+    else
+      vim.notify("No notes found", vim.log.levels.WARN)
+    end
+    return
+  end
+
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local previewers = require("telescope.previewers")
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  local entry_maker = function(note)
+    local normalized = helpers._normalize_for_display(note.Note)
+    local first_line = normalized:match("^[^\n]*")
+    local prefix = note.User == constants.LOCAL_USER_LABEL and "*" or ""
+    local display = note.Address .. ": " .. prefix .. first_line
+    local ordinal = note.Address .. " " .. note.User .. " " .. first_line
+
+    return {
+      value = note,
+      display = display,
+      ordinal = ordinal,
+    }
+  end
+
+  local previewer = previewers.new_buffer_previewer({
+    define_preview = function(self, entry, _)
+      local note = entry.value
+      local normalized = helpers._normalize_for_display(note.Note)
+      local lines = {
+        "Address: " .. note.Address,
+        "User: " .. note.User,
+        "",
+      }
+      vim.list_extend(lines, vim.split(normalized, "\n"))
+      vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+    end,
+  })
+
+  local picker_opts = {
+    prompt_title = "Notes for " .. game_id,
+    finder = finders.new_table({
+      results = notes,
+      entry_maker = entry_maker,
+    }),
+    previewer = previewer,
+    sorter = require("telescope.sorters").get_generic_fuzzy_sorter(),
+    sorting_strategy = "ascending",
+  }
+
+  if on_select then
+    picker_opts.attach_mappings = function(prompt_bufnr, map)
+      local function open_notes(split_cmd)
+        local picker = action_state.get_current_picker(prompt_bufnr)
+        local multiselect = picker:get_multi_selection()
+        local selection = action_state.get_selected_entry()
+        if selection then
+          actions.close(prompt_bufnr)
+          local selections = #multiselect > 0 and multiselect or { selection }
+          local prev_winnr = vim.api.nvim_get_current_win()
+          if split_cmd then
+            vim.cmd(split_cmd)
+          end
+          local selection_value = selection.value
+          for _, entry in ipairs(selections) do
+            if entry.value ~= selection_value then
+              open_note_buffer(entry.value, game_id, prev_winnr, false)
+            end
+          end
+          open_note_buffer(selection_value, game_id, prev_winnr, true)
+        end
+      end
+
+      map("i", "<C-x>", function() open_notes("split") end)
+      map("i", "<C-v>", function() open_notes("vsplit") end)
+
+      actions.select_default:replace(function()
+        open_notes(nil)
+      end)
+      return true
+    end
+  end
+
+  pickers.new({}, picker_opts):find()
+end
+
 function M.open_note(opts)
   local razz = opts.razz or require("razz")
   local game_id = opts.game_id
@@ -185,17 +202,7 @@ function M.open_note(opts)
 
   opts.notes = notes
 
-  opts.on_select = function(selection, selections)
-    local prev_winnr = vim.api.nvim_get_current_win()
-
-    local selection_value = selection.value
-    for _, entry in ipairs(selections) do
-      if entry.value ~= selection_value then
-        open_note_buffer(entry.value, game_id, prev_winnr, false)
-      end
-    end
-    open_note_buffer(selection_value, game_id, prev_winnr, true)
-  end
+  opts.on_select = function() end
 
   M.show_notes(opts)
 end
