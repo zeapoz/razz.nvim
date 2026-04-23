@@ -1,1 +1,1 @@
-return require('razz')
+return require("razz")

@@ -3,7 +3,44 @@ local M = {
     emulator_dirs = {},
   },
   picker = require("razz.picker"),
+  constants = require("razz.constants"),
+  helpers = require("razz.helpers"),
 }
+
+function M._ensure_configured()
+  if #M.config.emulator_dirs == 0 then
+    return false, "no emulator_dirs configured"
+  end
+  return true
+end
+
+function M._get_data_dir()
+  return vim.fn.expand(M.config.emulator_dirs[1]) .. "/" .. M.constants.RACACHE_DATA_DIR
+end
+
+function M._get_data_path(game_id, suffix)
+  return M._get_data_dir() .. game_id .. suffix
+end
+
+function M._parse_note_line(line)
+  local addr, content = line:match(M.constants.NOTE_LINE_WITH_CONTENT_PATTERN)
+  if addr and content then
+    content = M.helpers._unescape_content(content)
+    local normalized_addr = M.helpers._normalize_address(addr):lower()
+    return {
+      Address = normalized_addr,
+      Note = content,
+      User = M.constants.LOCAL_USER_LABEL,
+    }
+  end
+  return nil
+end
+
+function M._serialize_note(note)
+  local addr_padded = M.helpers._format_address(note.Address)
+  local escaped_note = M.helpers._escape_content(note.Note)
+  return M.constants.NOTE_PREFIX .. addr_padded .. ':"' .. escaped_note .. '"'
+end
 
 function M.setup(opts)
   opts = opts or {}
@@ -11,101 +48,102 @@ function M.setup(opts)
   return M
 end
 
+function M._get_game_id_or_error(opts)
+  if opts.game_id then
+    return opts.game_id
+  end
+  local game_id = M.get_current_game_id()
+  if not game_id then
+    vim.notify("Could not detect game ID from current buffer", vim.log.levels.ERROR)
+    return nil
+  end
+  return game_id
+end
+
 function M.get_data_paths()
   local paths = {}
   for _, dir in ipairs(M.config.emulator_dirs) do
-    table.insert(paths, vim.fn.expand(dir) .. "/RACache/Data")
+    table.insert(paths, vim.fn.expand(dir) .. "/" .. M.constants.RACACHE_DATA_DIR)
   end
   return paths
 end
 
 function M.load_server_notes(game_id)
-  if #M.config.emulator_dirs == 0 then
-    return {}
+  local ok, err = M._ensure_configured()
+  if not ok then
+    return {}, err
   end
 
-  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
-  local data_path = expanded_dir .. "/RACache/Data/" .. game_id .. "-Notes.json"
+  local data_path = M._get_data_path(game_id, M.constants.SERVER_NOTES_SUFFIX)
   local ok, lines = pcall(vim.fn.readfile, data_path)
   if not ok then
-    return {}
+    return {}, "failed to read file: " .. data_path
   end
 
   local content = table.concat(lines, "\n")
   local ok_decode, notes = pcall(vim.json.decode, content)
   if not ok_decode then
-    return {}
+    return {}, "failed to decode JSON"
   end
 
-  return notes or {}
+  for _, note in ipairs(notes) do
+    note.Address = M.helpers._normalize_address(note.Address)
+  end
+
+  return notes or {}, nil
 end
 
 function M.load_local_notes(game_id)
-  if #M.config.emulator_dirs == 0 then
-    return {}
+  local ok, err = M._ensure_configured()
+  if not ok then
+    return {}, err
   end
 
-  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
-  local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
+  local user_file = M._get_data_path(game_id, M.constants.USER_NOTES_SUFFIX)
 
-  local ok, _ = vim.fn.filereadable(user_file)
-  if ok == 0 then
-    return {}
+  local readable = vim.fn.filereadable(user_file)
+  if readable == 0 then
+    return {}, "file not found: " .. user_file
   end
 
   local lines = vim.fn.readfile(user_file)
   local notes = {}
 
-  for i = 3, #lines do
-    local line = lines[i]
-    local addr, note = line:match('^N0:(0x[%x]+):"(.*)"')
-    if addr and note then
-      note = note:gsub("\\r", "\r"):gsub("\\n", "\n")
-      local num_part = addr:sub(3):gsub("^0+", "")
-      if num_part == "" then num_part = "0" end
-      addr = "0x" .. num_part
-      table.insert(notes, {
-        Address = addr:lower(),
-        Note = note,
-        User = "Local Note",
-      })
+  for i = M.constants.HEADER_LINE_COUNT, #lines do
+    local note = M._parse_note_line(lines[i])
+    if note then
+      table.insert(notes, note)
     end
   end
 
-  return notes
-end
-
-function M.get_server_notes(game_id)
-  return M.load_server_notes(game_id)
-end
-
-function M.get_local_notes(game_id)
-  return M.load_local_notes(game_id)
+  return notes, nil
 end
 
 function M.get_notes(game_id)
-  local server_notes = M.load_server_notes(game_id)
-  local local_notes = M.load_local_notes(game_id)
+  local server_notes, _ = M.load_server_notes(game_id)
+  local local_notes, _ = M.load_local_notes(game_id)
 
   local local_by_addr = {}
   for _, note in ipairs(local_notes) do
-    local_by_addr[note.Address:lower()] = note
+    local_by_addr[note.Address] = note
   end
 
   local results = {}
   local used_local = {}
 
   for _, note in ipairs(server_notes) do
-    if local_by_addr[note.Address:lower()] then
-      table.insert(results, local_by_addr[note.Address:lower()])
-      used_local[note.Address:lower()] = true
+    local addr = note.Address
+    if local_by_addr[addr] then
+      table.insert(results, local_by_addr[addr])
+      used_local[addr] = true
     else
       table.insert(results, note)
     end
   end
 
   for _, note in ipairs(local_notes) do
-    if not used_local[note.Address:lower()] then
+    local addr = note.Address
+    if not used_local[addr] then
       table.insert(results, note)
     end
   end
@@ -128,13 +166,11 @@ function M.show_notes(opts)
   end
   opts = opts or {}
 
-  if not opts.game_id then
-    opts.game_id = M.get_current_game_id()
-    if not opts.game_id then
-      vim.notify("Could not detect game ID from current buffer", vim.log.levels.ERROR)
-      return
-    end
+  local game_id = M._get_game_id_or_error(opts)
+  if not game_id then
+    return
   end
+  opts.game_id = game_id
   M.picker.show_notes(opts)
 end
 
@@ -144,34 +180,33 @@ function M.open_note(opts)
   end
   opts = opts or {}
 
-  if not opts.game_id then
-    opts.game_id = M.get_current_game_id()
-    if not opts.game_id then
-      vim.notify("Could not detect game ID from current buffer", vim.log.levels.ERROR)
-      return
-    end
+  local game_id = M._get_game_id_or_error(opts)
+  if not game_id then
+    return
   end
+  opts.game_id = game_id
   M.picker.open_note(opts)
 end
 
 function M.export_note(game_id, note)
-  if #M.config.emulator_dirs == 0 then
-    return false, "no emulator_dirs configured"
+  local ok, err = M._ensure_configured()
+  if not ok then
+    return false, err
   end
 
-  return M._write_user_note(game_id, note, true)
+  return M._write_user_note(game_id, note)
 end
 
 function M.delete_local_note(game_id, address)
-  if #M.config.emulator_dirs == 0 then
-    return false, "no emulator_dirs configured"
+  local ok, err = M._ensure_configured()
+  if not ok then
+    return false, err
   end
 
-  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
-  local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
+  local user_file = M._get_data_path(game_id, M.constants.USER_NOTES_SUFFIX)
 
-  local ok, _ = vim.fn.filereadable(user_file)
-  if ok == 0 then
+  local readable = vim.fn.filereadable(user_file)
+  if readable == 0 then
     return false, "file not found: " .. user_file
   end
 
@@ -180,11 +215,11 @@ function M.delete_local_note(game_id, address)
   local new_lines = {}
 
   for i = 1, #lines do
-    if i < 3 then
+    if i < M.constants.HEADER_LINE_COUNT then
       table.insert(new_lines, lines[i])
     else
       local line = lines[i]
-      local addr = line:match("^N0:(0x[%x]+):")
+      local addr = line:match(M.constants.NOTE_LINE_PATTERN)
       if addr then
         local existing_addr_num = tonumber(addr, 16)
         if existing_addr_num ~= addr_num then
@@ -200,25 +235,23 @@ function M.delete_local_note(game_id, address)
   return true
 end
 
-function M._write_user_note(game_id, note, keep_if_same)
-  local expanded_dir = vim.fn.expand(M.config.emulator_dirs[1])
-  local user_file = expanded_dir .. "/RACache/Data/" .. game_id .. "-User.txt"
+function M._write_user_note(game_id, note)
+  local user_file = M._get_data_path(game_id, M.constants.USER_NOTES_SUFFIX)
 
-  local ok, _ = vim.fn.filereadable(user_file)
-  if ok == 0 then
+  local readable = vim.fn.filereadable(user_file)
+  if readable == 0 then
     return false, "file not found: " .. user_file
   end
 
   local lines = vim.fn.readfile(user_file)
-  local new_addr_num = tonumber(note.Address, 16)
-  local new_addr_padded = string.format("0x%08x", new_addr_num)
-  local new_line = "N0:" .. new_addr_padded .. ":\"" .. note.Note .. "\""
+  local new_line = M._serialize_note(note)
 
   local found = false
-  for i = 3, #lines do
-    local addr = lines[i]:match("^N0:(0x[%x]+):")
+  for i = M.constants.HEADER_LINE_COUNT, #lines do
+    local addr = lines[i]:match(M.constants.NOTE_LINE_PATTERN)
     if addr then
       local addr_num = tonumber(addr, 16)
+      local new_addr_num = tonumber(note.Address, 16)
       if addr_num == new_addr_num then
         lines[i] = new_line
         found = true
@@ -229,10 +262,11 @@ function M._write_user_note(game_id, note, keep_if_same)
 
   if not found then
     local insert_pos = #lines + 1
-    for i = 3, #lines do
-      local addr = lines[i]:match("^N0:(0x[%x]+):")
+    for i = M.constants.HEADER_LINE_COUNT, #lines do
+      local addr = lines[i]:match(M.constants.NOTE_LINE_PATTERN)
       if addr then
         local addr_num = tonumber(addr, 16)
+        local new_addr_num = tonumber(note.Address, 16)
         if addr_num > new_addr_num then
           insert_pos = i
           break
@@ -247,3 +281,4 @@ function M._write_user_note(game_id, note, keep_if_same)
 end
 
 return M
+

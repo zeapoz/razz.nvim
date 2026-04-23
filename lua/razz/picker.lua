@@ -1,13 +1,15 @@
 local M = {}
+local constants = require("razz.constants")
+local helpers = require("razz.helpers")
 
 function M.show_notes(opts)
-  local ok, telescope = pcall(require, "telescope")
+  local ok, _ = pcall(require, "telescope")
   if not ok then
     vim.notify("telescope not installed", vim.log.levels.ERROR)
     return
   end
 
-  local razz = require("razz")
+  local razz = opts.razz or require("razz")
   local game_id = opts.game_id
   local on_select = opts.on_select
   local notes = opts.notes
@@ -36,9 +38,9 @@ function M.show_notes(opts)
   local action_state = require("telescope.actions.state")
 
   local entry_maker = function(note)
-    local normalized = note.Note:gsub("\r\n", "\n")
+    local normalized = helpers._normalize_for_display(note.Note)
     local first_line = normalized:match("^[^\n]*")
-    local prefix = note.User == "Local Note" and "*" or ""
+    local prefix = note.User == constants.LOCAL_USER_LABEL and "*" or ""
     local display = note.Address .. ": " .. prefix .. first_line
     local ordinal = note.Address .. " " .. note.User .. " " .. first_line
 
@@ -50,16 +52,15 @@ function M.show_notes(opts)
   end
 
   local previewer = previewers.new_buffer_previewer({
-    define_preview = function(self, entry, status)
+    define_preview = function(self, entry, _)
       local note = entry.value
-      local normalized = note.Note:gsub("\r\n", "\n")
-      local note_lines = vim.split(normalized, "\n", false, { keepempty = true })
+      local normalized = helpers._normalize_for_display(note.Note)
       local lines = {
         "Address: " .. note.Address,
         "User: " .. note.User,
         "",
       }
-      vim.list_extend(lines, note_lines)
+      vim.list_extend(lines, vim.split(normalized, "\n"))
       vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
     end,
   })
@@ -92,7 +93,7 @@ function M.show_notes(opts)
 end
 
 function M.open_note(opts)
-  local razz = require("razz")
+  local razz = opts.razz or require("razz")
   local game_id = opts.game_id
   local get_notes_fn = opts.get_notes_fn
 
@@ -108,9 +109,10 @@ function M.open_note(opts)
   opts.on_select = function(note)
     local prev_winnr = vim.api.nvim_get_current_win()
     local note_addr = note.Address
-    local buf = vim.api.nvim_create_buf(true, "")
+    local buf = vim.api.nvim_create_buf(true, false)
     vim.bo[buf].fileformat = "dos"
-    local lines = vim.split(note.Note, "\r\n", false, { keepempty = true })
+    local note_content = helpers._unescape_content(note.Note)
+    local lines = vim.split(note_content, "\r\n", { keepempty = true })
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     vim.api.nvim_buf_set_name(buf, "Note: " .. note_addr)
     vim.bo[buf].filetype = "text"
@@ -118,7 +120,7 @@ function M.open_note(opts)
 
     local function to_export_content(buf_lines)
       local content = table.concat(buf_lines, "\r\n")
-      content = content:gsub("\r", "\\r"):gsub("\n", "\\n")
+      content = helpers._escape_content(content)
       return content
     end
 
@@ -132,16 +134,11 @@ function M.open_note(opts)
         local current_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
         local current_content = to_export_content(current_lines)
 
-        local normalized_content = current_content:gsub("\\r", "\r"):gsub("\\n", "\n")
+        local normalized_content = helpers._unescape_content(current_content)
 
-        local server_notes = razz.get_server_notes(game_id)
-        local server_note_content = nil
-        for _, sn in ipairs(server_notes) do
-          if sn.Address:lower() == note_addr:lower() then
-            server_note_content = sn.Note
-            break
-          end
-        end
+        local server_notes = razz.load_server_notes(game_id)
+        local server_note = helpers.find_note_by_addr(server_notes, note_addr)
+        local server_note_content = server_note and server_note.Note or nil
 
         local export_note = { Address = note_addr, Note = current_content }
 
@@ -165,7 +162,6 @@ function M.open_note(opts)
           end
         end
 
-        original_content = current_content
         vim.bo[buf].modified = false
       end,
     })
