@@ -4,6 +4,18 @@ local helpers = require("razz.helpers")
 
 local function open_note_buffer(note, game_id, prev_winnr, focus)
   local note_addr = note.Address
+  local normalized = helpers._normalize_for_display(note.Note)
+  local first_line = normalized:match("^[^\n]*")
+  local buf_name = note_addr .. ": " .. first_line
+
+  local existing_buf = vim.fn.bufnr(buf_name)
+  if existing_buf ~= -1 then
+    if focus then
+      vim.api.nvim_win_set_buf(0, existing_buf)
+    end
+    return
+  end
+
   local buf = vim.api.nvim_create_buf(true, false)
   vim.bo[buf].modifiable = true
   vim.bo[buf].fileformat = "dos"
@@ -12,9 +24,7 @@ local function open_note_buffer(note, game_id, prev_winnr, focus)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modified = false
 
-  local normalized = helpers._normalize_for_display(note.Note)
-  local first_line = normalized:match("^[^\n]*")
-  vim.api.nvim_buf_set_name(buf, note_addr .. ": " .. first_line)
+  vim.api.nvim_buf_set_name(buf, buf_name)
   vim.bo[buf].filetype = "text"
 
   local function to_export_content(buf_lines)
