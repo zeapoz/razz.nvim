@@ -1,22 +1,26 @@
 local M = {}
 
-function M._unescape_content(content)
+function M.unescape_content(content)
   return content:gsub("\\r", "\r"):gsub("\\n", "\n")
 end
 
-function M._escape_content(content)
+function M.escape_content(content)
   return content:gsub("\r", "\\r"):gsub("\n", "\\n")
 end
 
-function M._normalize_address(addr)
+function M.normalize_address(addr)
   local num_part = addr:sub(3):gsub("^0+", "")
-  if num_part == "" then num_part = "0" end
+  if num_part == "" then
+    num_part = "0"
+  end
   return "0x" .. num_part
 end
 
-function M._format_address(addr)
+function M.format_address(addr)
   local num = tonumber(addr, 16)
-  if not num then return addr end
+  if not num then
+    return addr
+  end
   return string.format("0x%08x", num)
 end
 
@@ -35,7 +39,7 @@ function M.find_note_by_addr(notes, address)
   return nil
 end
 
-function M._normalize_for_display(content)
+function M.normalize_for_display(content)
   return content:gsub("\r\n", "\n")
 end
 
