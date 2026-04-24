@@ -1,3 +1,5 @@
+local _server_notes_cache = {}
+
 local M = {
   config = {
     emulator_dirs = {},
@@ -69,6 +71,10 @@ function M.get_data_paths()
 end
 
 function M.load_server_notes(game_id)
+  if _server_notes_cache[game_id] then
+    return _server_notes_cache[game_id], nil
+  end
+
   local ok, err = M._ensure_configured()
   if not ok then
     return {}, err
@@ -90,7 +96,16 @@ function M.load_server_notes(game_id)
     note.Address = M.helpers._normalize_address(note.Address)
   end
 
-  return notes or {}, nil
+  _server_notes_cache[game_id] = notes
+  return notes, nil
+end
+
+function M.clear_server_notes_cache(game_id)
+  if game_id then
+    _server_notes_cache[game_id] = nil
+  else
+    _server_notes_cache = {}
+  end
 end
 
 function M.load_local_notes(game_id)
