@@ -189,6 +189,26 @@ function M.show_notes(opts)
   M.picker.show_notes(opts)
 end
 
+function M.show_local_notes(opts)
+  opts = opts or {}
+  if type(opts) == "string" then
+    opts = { game_id = opts, get_notes_fn = M.load_local_notes }
+  else
+    opts.get_notes_fn = M.load_local_notes
+  end
+  M.show_notes(opts)
+end
+
+function M.show_server_notes(opts)
+  opts = opts or {}
+  if type(opts) == "string" then
+    opts = { game_id = opts, get_notes_fn = M.load_server_notes }
+  else
+    opts.get_notes_fn = M.load_server_notes
+  end
+  M.show_notes(opts)
+end
+
 function M.open_note(opts)
   if type(opts) == "string" then
     opts = { game_id = opts }
@@ -201,6 +221,26 @@ function M.open_note(opts)
   end
   opts.game_id = game_id
   M.picker.open_note(opts)
+end
+
+function M.open_local_notes(opts)
+  opts = opts or {}
+  if type(opts) == "string" then
+    opts = { game_id = opts, get_notes_fn = M.load_local_notes }
+  else
+    opts.get_notes_fn = M.load_local_notes
+  end
+  M.open_note(opts)
+end
+
+function M.open_server_notes(opts)
+  opts = opts or {}
+  if type(opts) == "string" then
+    opts = { game_id = opts, get_notes_fn = M.load_server_notes }
+  else
+    opts.get_notes_fn = M.load_server_notes
+  end
+  M.open_note(opts)
 end
 
 function M.export_note(game_id, note)
