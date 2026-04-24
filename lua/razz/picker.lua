@@ -2,6 +2,14 @@ local M = {}
 local constants = require("razz.constants")
 local helpers = require("razz.helpers")
 
+local function get_brackets_highlights(text, hl_group)
+  local highlights = {}
+  for s, e in text:gmatch("()(%[[^]]*%])") do
+    table.insert(highlights, { { s - 1, s - 1 + #e }, hl_group })
+  end
+  return highlights
+end
+
 local function open_note_buffer(note, game_id, prev_winnr, focus)
   local note_addr = note.Address
   local normalized = helpers._normalize_for_display(note.Note)
@@ -25,7 +33,7 @@ local function open_note_buffer(note, game_id, prev_winnr, focus)
   vim.bo[buf].modified = false
 
   vim.api.nvim_buf_set_name(buf, buf_name)
-  vim.bo[buf].filetype = "text"
+  vim.bo[buf].filetype = "ranote"
 
   local function to_export_content(buf_lines)
     local content = table.concat(buf_lines, "\r\n")
@@ -122,17 +130,37 @@ function M.show_notes(opts)
   local previewers = require("telescope.previewers")
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
+  local entry_display = require("telescope.pickers.entry_display")
+
+  local displayer = entry_display.create({
+    separator = "",
+    items = {
+      { remaining = true },
+      { remaining = true },
+      { remaining = true },
+    },
+  })
 
   local entry_maker = function(note)
     local normalized = helpers._normalize_for_display(note.Note)
     local first_line = normalized:match("^[^\n]*")
     local prefix = note.User == constants.LOCAL_USER_LABEL and "*" or ""
-    local display = note.Address .. ": " .. prefix .. first_line
     local ordinal = note.Address .. " " .. note.User .. " " .. first_line
 
     return {
       value = note,
-      display = display,
+      display = function()
+        return displayer({
+          { note.Address, "TelescopeResultsNumber" },
+          { ": " .. prefix },
+          {
+            first_line,
+            function()
+              return get_brackets_highlights(first_line, "Keyword")
+            end,
+          },
+        })
+      end,
       ordinal = ordinal,
     }
   end
@@ -148,6 +176,7 @@ function M.show_notes(opts)
       }
       vim.list_extend(lines, vim.split(normalized, "\n"))
       vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+      vim.bo[self.state.bufnr].filetype = "ranote"
     end,
   })
 
@@ -185,8 +214,12 @@ function M.show_notes(opts)
         end
       end
 
-      map("i", "<C-x>", function() open_notes("split") end)
-      map("i", "<C-v>", function() open_notes("vsplit") end)
+      map("i", "<C-x>", function()
+        open_notes("split")
+      end)
+      map("i", "<C-v>", function()
+        open_notes("vsplit")
+      end)
 
       actions.select_default:replace(function()
         open_notes(nil)
