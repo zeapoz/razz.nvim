@@ -258,5 +258,33 @@ function M.open_server(opts)
   require("razz.picker").open({ game_id = game_id, notes = notes_list })
 end
 
+function M.create_new(opts, address)
+  if type(opts) == "string" then
+    opts = { game_id = opts }
+  end
+  opts = opts or {}
+
+  local game_id = razz.get_game_id_or_error(opts)
+  if not game_id then
+    return
+  end
+
+  local function do_create(addr)
+    local normalized = helpers.normalize_address(addr)
+    local note = { Address = normalized, Note = "" }
+    require("razz.notes.buffer").open_buffer(note, game_id, nil, true)
+  end
+
+  if address then
+    do_create(address)
+  else
+    vim.ui.input({ prompt = "Address: " }, function(input)
+      if input and input ~= "" then
+        do_create(input)
+      end
+    end)
+  end
+end
+
 return M
 

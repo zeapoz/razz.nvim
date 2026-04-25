@@ -51,7 +51,10 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
 
       local export_note = { Address = note_addr, Note = current_content }
 
-      if server_note_content and normalized_content == server_note_content then
+      if not server_note and current_content == "" then
+        notes.delete_local(game_id, note_addr)
+        vim.notify("Empty note discarded: " .. note_addr)
+      elseif server_note_content and normalized_content == server_note_content then
         local ok, err = notes.delete_local(game_id, note_addr)
         if ok then
           vim.notify("Note matches server, removed local: " .. note_addr)
