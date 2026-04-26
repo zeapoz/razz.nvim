@@ -1,6 +1,4 @@
 local M = {}
-local constants = require("razz.constants")
-local helpers = require("razz.helpers")
 local notes = require("razz.notes")
 local notes_buffer = require("razz.notes.buffer")
 
@@ -57,16 +55,16 @@ function M.show(opts)
   })
 
   local entry_maker = function(note)
-    local normalized = helpers.normalize_for_display(note.Note)
-    local first_line = normalized:match("^[^\n]*")
-    local prefix = note.User == constants.LOCAL_USER_LABEL and "*" or ""
-    local ordinal = note.Address .. " " .. note.User .. " " .. first_line
+    local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
+    local first_line = unescaped:match("^[^\n]*")
+    local prefix = note:is_local() and "*" or ""
+    local ordinal = note.address .. " " .. note.user .. " " .. first_line
 
     return {
       value = note,
       display = function()
         return displayer({
-          { note.Address, "TelescopeResultsNumber" },
+          { note.address, "TelescopeResultsNumber" },
           { ": " .. prefix },
           {
             first_line,
@@ -83,13 +81,13 @@ function M.show(opts)
   local previewer = previewers.new_buffer_previewer({
     define_preview = function(self, entry, _)
       local note = entry.value
-      local normalized = helpers.normalize_for_display(note.Note)
+      local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
       local lines = {
-        "Address: " .. note.Address,
-        "User: " .. note.User,
+        "Address: " .. note.address,
+        "User: " .. note.user,
         "",
       }
-      vim.list_extend(lines, vim.split(normalized, "\n"))
+      vim.list_extend(lines, vim.split(unescaped, "\n"))
       vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
       vim.bo[self.state.bufnr].filetype = "ranote"
     end,

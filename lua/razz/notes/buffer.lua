@@ -1,11 +1,11 @@
 local M = {}
-local helpers = require("razz.helpers")
 local notes = require("razz.notes")
+local CodeNote = require("razz.notes.type")
 
 function M.open_buffer(note, game_id, prev_winnr, focus)
-  local note_addr = note.Address
-  local normalized = helpers.normalize_for_display(note.Note)
-  local first_line = normalized:match("^[^\n]*")
+  local note_addr = note.address
+  local note_content = note.content:gsub("\\r", "\r"):gsub("\\n", "\n")
+  local first_line = note_content:match("^[^\n]*")
   local buf_name = note_addr .. ": " .. first_line
 
   local existing_buf = vim.fn.bufnr(buf_name)
@@ -19,19 +19,12 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.bo[buf].modifiable = true
   vim.bo[buf].fileformat = "dos"
-  local note_content = helpers.unescape_content(note.Note)
   local lines = vim.split(note_content, "\r\n", { keepempty = true })
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modified = false
 
   vim.api.nvim_buf_set_name(buf, buf_name)
   vim.bo[buf].filetype = "ranote"
-
-  local function to_export_content(buf_lines)
-    local content = table.concat(buf_lines, "\r\n")
-    content = helpers.escape_content(content)
-    return content
-  end
 
   if focus ~= false then
     vim.api.nvim_win_set_buf(0, buf)
@@ -41,20 +34,22 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
     buffer = buf,
     callback = function()
       local current_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-      local current_content = to_export_content(current_lines)
-
-      local normalized_content = helpers.unescape_content(current_content)
+      local current_content = table.concat(current_lines, "\r\n")
 
       local server_notes = notes.load_from_server(game_id)
-      local server_note = helpers.find_note_by_addr(server_notes, note_addr)
-      local server_note_content = server_note and server_note.Note or nil
-
-      local export_note = { Address = note_addr, Note = current_content }
+      local server_note = nil
+      for _, n in ipairs(server_notes) do
+        if n.address == note_addr then
+          server_note = n
+          break
+        end
+      end
+      local server_note_content = server_note and server_note.content or nil
 
       if not server_note and current_content == "" then
         notes.delete_local(game_id, note_addr)
         vim.notify("Empty note discarded: " .. note_addr)
-      elseif server_note_content and normalized_content == server_note_content then
+      elseif server_note_content and current_content == server_note_content then
         local ok, err = notes.delete_local(game_id, note_addr)
         if ok then
           vim.notify("Note matches server, removed local: " .. note_addr)
@@ -62,6 +57,7 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
           vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
         end
       else
+        local export_note = CodeNote:from_buffer_content(note_addr, current_content)
         local ok, err = notes.export(game_id, export_note)
         if ok then
           if server_note_content then

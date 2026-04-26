@@ -1,29 +1,9 @@
 local M = {}
 local _server_notes_cache = {}
 local constants = require("razz.constants")
-local helpers = require("razz.helpers")
 local storage = require("razz.storage")
 local razz = require("razz")
-
-function M._parse_line(line)
-  local addr, content = line:match(constants.NOTE_LINE_WITH_CONTENT_PATTERN)
-  if addr and content then
-    content = helpers.unescape_content(content)
-    local normalized_addr = helpers.normalize_address(addr):lower()
-    return {
-      Address = normalized_addr,
-      Note = content,
-      User = constants.LOCAL_USER_LABEL,
-    }
-  end
-  return nil
-end
-
-function M._serialize(note)
-  local addr_padded = helpers.format_address(note.Address)
-  local escaped_note = helpers.escape_content(note.Note)
-  return constants.NOTE_PREFIX .. addr_padded .. ':"' .. escaped_note .. '"'
-end
+local CodeNote = require("razz.notes.type")
 
 function M.load_from_server(game_id)
   if _server_notes_cache[game_id] then
@@ -40,13 +20,14 @@ function M.load_from_server(game_id)
   end
 
   local content = table.concat(lines, "\n")
-  local ok_decode, notes = pcall(vim.json.decode, content)
+  local ok_decode, json_notes = pcall(vim.json.decode, content)
   if not ok_decode then
     return {}, "failed to decode JSON"
   end
 
-  for _, note in ipairs(notes) do
-    note.Address = helpers.normalize_address(note.Address)
+  local notes = {}
+  for _, json_note in ipairs(json_notes) do
+    table.insert(notes, CodeNote:from_server(json_note))
   end
 
   _server_notes_cache[game_id] = notes
@@ -80,7 +61,7 @@ function M.load_from_local(game_id)
   local notes = {}
 
   for i = constants.HEADER_LINE_COUNT, #lines do
-    local note = M._parse_line(lines[i])
+    local note = CodeNote:from_line(lines[i])
     if note then
       table.insert(notes, note)
     end
@@ -95,14 +76,14 @@ function M.get_all(game_id)
 
   local local_by_addr = {}
   for _, note in ipairs(local_notes) do
-    local_by_addr[note.Address] = note
+    local_by_addr[note.address] = note
   end
 
   local results = {}
   local used_local = {}
 
   for _, note in ipairs(server_notes) do
-    local addr = note.Address
+    local addr = note.address
     if local_by_addr[addr] then
       table.insert(results, local_by_addr[addr])
       used_local[addr] = true
@@ -112,7 +93,7 @@ function M.get_all(game_id)
   end
 
   for _, note in ipairs(local_notes) do
-    local addr = note.Address
+    local addr = note.address
     if not used_local[addr] then
       table.insert(results, note)
     end
@@ -168,13 +149,13 @@ function M._write_local_note(game_id, note)
   end
 
   local lines = vim.fn.readfile(err_or_path)
-  local new_line = M._serialize(note)
+  local new_line = note:serialize()
 
-  local idx = M._find_line_idx_by_addr(lines, note.Address)
+  local idx = M._find_line_idx_by_addr(lines, note.address)
   if idx then
     lines[idx] = new_line
   else
-    local insert_pos = M._find_line_idx_by_addr(lines, note.Address, { find_insert_pos = true }) or #lines + 1
+    local insert_pos = M._find_line_idx_by_addr(lines, note.address, { find_insert_pos = true }) or #lines + 1
     table.insert(lines, insert_pos, new_line)
   end
 
@@ -243,8 +224,7 @@ function M.create_new(opts, address)
   end
 
   local function do_create(addr)
-    local normalized = helpers.normalize_address(addr)
-    local note = { Address = normalized, Note = "" }
+    local note = CodeNote:new_note(addr, "")
     require("razz.notes.buffer").open_buffer(note, game_id, nil, true)
   end
 
