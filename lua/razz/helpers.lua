@@ -9,11 +9,7 @@ function M.escape_content(content)
 end
 
 function M.normalize_address(addr)
-  local num_part = addr:sub(3):gsub("^0+", "")
-  if num_part == "" then
-    num_part = "0"
-  end
-  return "0x" .. num_part
+  return string.format("0x%x", tonumber(addr, 16))
 end
 
 function M.format_address(addr)
@@ -27,7 +23,10 @@ end
 function M.addresses_equal(addr1, addr2)
   local num1 = tonumber(addr1, 16)
   local num2 = tonumber(addr2, 16)
-  return num1 and num2 and num1 == num2
+  if not num1 or not num2 then
+    return false
+  end
+  return num1 == num2
 end
 
 function M.find_note_by_addr(notes, address)

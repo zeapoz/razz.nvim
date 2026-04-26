@@ -4,7 +4,7 @@ local M = {
   },
 }
 
-function M._ensure_configured()
+function M.ensure_configured()
   if #M.config.emulator_dirs == 0 then
     return false, "no emulator_dirs configured"
   end
@@ -12,18 +12,20 @@ function M._ensure_configured()
 end
 
 function M.get_game_id_or_error(opts)
-  if opts.game_id then
+  if type(opts) == "string" then
+    return opts
+  end
+  if opts and opts.game_id then
     return opts.game_id
   end
-  local game_id = M._get_current_game_id()
+  local game_id = M._infer_current_game_id()
   if not game_id then
-    vim.notify("Could not detect game ID from current buffer", vim.log.levels.ERROR)
-    return nil
+    return nil, "Could not detect game ID from current buffer"
   end
   return game_id
 end
 
-function M._get_current_game_id()
+function M._infer_current_game_id()
   local lines = vim.api.nvim_buf_get_lines(0, 0, 2, false)
   if #lines < 2 then
     return nil

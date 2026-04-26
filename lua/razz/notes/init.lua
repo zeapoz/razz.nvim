@@ -30,12 +30,10 @@ function M.load_from_server(game_id)
     return _server_notes_cache[game_id], nil
   end
 
-  local ok, err = pcall(razz._ensure_configured)
-  if not ok then
-    return {}, err
+  local data_path, path_err = storage.get_data_path(game_id, constants.SERVER_NOTES_SUFFIX)
+  if not data_path then
+    return {}, path_err
   end
-
-  local data_path = storage._get_data_path(game_id, constants.SERVER_NOTES_SUFFIX)
   local ok, lines = pcall(vim.fn.readfile, data_path)
   if not ok then
     return {}, "failed to read file: " .. data_path
@@ -64,19 +62,21 @@ function M.clear_server_cache(game_id)
 end
 
 function M.load_from_local(game_id)
-  local ok, err = pcall(razz._ensure_configured)
-  if not ok then
-    return {}, err
+  local user_file, path_err = storage.get_data_path(game_id, constants.USER_NOTES_SUFFIX)
+  if not user_file then
+    return {}, path_err
   end
-
-  local user_file = storage._get_data_path(game_id, constants.USER_NOTES_SUFFIX)
 
   local readable = vim.fn.filereadable(user_file)
   if readable == 0 then
     return {}, "file not found: " .. user_file
   end
 
-  local lines = vim.fn.readfile(user_file)
+  local ok, lines = pcall(vim.fn.readfile, user_file)
+  if not ok then
+    return {}, "failed to read file: " .. user_file
+  end
+
   local notes = {}
 
   for i = constants.HEADER_LINE_COUNT, #lines do
@@ -121,106 +121,91 @@ function M.get_all(game_id)
   return results
 end
 
-function M._write_local_note(game_id, note)
-  local user_file = storage._get_data_path(game_id, constants.USER_NOTES_SUFFIX)
-
+function M._ensure_user_file_exists(game_id)
+  local user_file, path_err = storage.get_data_path(game_id, constants.USER_NOTES_SUFFIX)
+  if not user_file then
+    return false, path_err
+  end
   local readable = vim.fn.filereadable(user_file)
   if readable == 0 then
     return false, "file not found: " .. user_file
   end
+  return true, user_file
+end
 
-  local lines = vim.fn.readfile(user_file)
-  local new_line = M._serialize(note)
+function M._find_line_idx_by_addr(lines, addr, opts)
+  local addr_num = tonumber(addr, 16)
+  if not addr_num then
+    return nil
+  end
 
-  local found = false
+  local find_insert_pos = opts and opts.find_insert_pos
+  local insert_pos = #lines + 1
+
   for i = constants.HEADER_LINE_COUNT, #lines do
-    local addr = lines[i]:match(constants.NOTE_LINE_PATTERN)
-    if addr then
-      local addr_num = tonumber(addr, 16)
-      local new_addr_num = tonumber(note.Address, 16)
-      if addr_num == new_addr_num then
-        lines[i] = new_line
-        found = true
-        break
+    local line_addr = lines[i]:match(constants.NOTE_LINE_PATTERN)
+    if line_addr then
+      local line_addr_num = tonumber(line_addr, 16)
+      if line_addr_num == addr_num then
+        return i
+      end
+      if find_insert_pos and line_addr_num > addr_num and i < insert_pos then
+        insert_pos = i
       end
     end
   end
 
-  if not found then
-    local insert_pos = #lines + 1
-    for i = constants.HEADER_LINE_COUNT, #lines do
-      local addr = lines[i]:match(constants.NOTE_LINE_PATTERN)
-      if addr then
-        local addr_num = tonumber(addr, 16)
-        local new_addr_num = tonumber(note.Address, 16)
-        if addr_num > new_addr_num then
-          insert_pos = i
-          break
-        end
-      end
-    end
+  if find_insert_pos then
+    return insert_pos
+  end
+  return nil
+end
+
+function M._write_local_note(game_id, note)
+  local ok, err_or_path = M._ensure_user_file_exists(game_id)
+  if not ok then
+    return false, err_or_path
+  end
+
+  local lines = vim.fn.readfile(err_or_path)
+  local new_line = M._serialize(note)
+
+  local idx = M._find_line_idx_by_addr(lines, note.Address)
+  if idx then
+    lines[idx] = new_line
+  else
+    local insert_pos = M._find_line_idx_by_addr(lines, note.Address, { find_insert_pos = true }) or #lines + 1
     table.insert(lines, insert_pos, new_line)
   end
 
-  vim.fn.writefile(lines, user_file)
+  vim.fn.writefile(lines, err_or_path)
   return true
 end
 
 function M.delete_local(game_id, address)
-  local ok, err = pcall(razz._ensure_configured)
+  local ok, err_or_path = M._ensure_user_file_exists(game_id)
   if not ok then
-    return false, err
+    return false, err_or_path
   end
 
-  local user_file = storage._get_data_path(game_id, constants.USER_NOTES_SUFFIX)
-
-  local readable = vim.fn.filereadable(user_file)
-  if readable == 0 then
-    return false, "file not found: " .. user_file
+  local lines = vim.fn.readfile(err_or_path)
+  local idx = M._find_line_idx_by_addr(lines, address)
+  if idx then
+    table.remove(lines, idx)
   end
 
-  local lines = vim.fn.readfile(user_file)
-  local addr_num = tonumber(address, 16)
-  local new_lines = {}
-
-  for i = 1, #lines do
-    if i < constants.HEADER_LINE_COUNT then
-      table.insert(new_lines, lines[i])
-    else
-      local line = lines[i]
-      local addr = line:match(constants.NOTE_LINE_PATTERN)
-      if addr then
-        local existing_addr_num = tonumber(addr, 16)
-        if existing_addr_num ~= addr_num then
-          table.insert(new_lines, line)
-        end
-      else
-        table.insert(new_lines, line)
-      end
-    end
-  end
-
-  vim.fn.writefile(new_lines, user_file)
+  vim.fn.writefile(lines, err_or_path)
   return true
 end
 
 function M.export(game_id, note)
-  local ok, err = pcall(razz._ensure_configured)
-  if not ok then
-    return false, err
-  end
-
   return M._write_local_note(game_id, note)
 end
 
 function M.open(opts)
-  if type(opts) == "string" then
-    opts = { game_id = opts }
-  end
-  opts = opts or {}
-
-  local game_id = razz.get_game_id_or_error(opts)
+  local game_id, err = razz.get_game_id_or_error(opts)
   if not game_id then
+    vim.notify(err, vim.log.levels.ERROR)
     return
   end
 
@@ -229,13 +214,9 @@ function M.open(opts)
 end
 
 function M.open_local(opts)
-  opts = opts or {}
-  if type(opts) == "string" then
-    opts = { game_id = opts }
-  end
-
-  local game_id = razz.get_game_id_or_error(opts)
+  local game_id, err = razz.get_game_id_or_error(opts)
   if not game_id then
+    vim.notify(err, vim.log.levels.ERROR)
     return
   end
 
@@ -244,13 +225,9 @@ function M.open_local(opts)
 end
 
 function M.open_server(opts)
-  opts = opts or {}
-  if type(opts) == "string" then
-    opts = { game_id = opts }
-  end
-
-  local game_id = razz.get_game_id_or_error(opts)
+  local game_id, err = razz.get_game_id_or_error(opts)
   if not game_id then
+    vim.notify(err, vim.log.levels.ERROR)
     return
   end
 
@@ -259,13 +236,9 @@ function M.open_server(opts)
 end
 
 function M.create_new(opts, address)
-  if type(opts) == "string" then
-    opts = { game_id = opts }
-  end
-  opts = opts or {}
-
-  local game_id = razz.get_game_id_or_error(opts)
+  local game_id, err = razz.get_game_id_or_error(opts)
   if not game_id then
+    vim.notify(err, vim.log.levels.ERROR)
     return
   end
 
@@ -287,4 +260,3 @@ function M.create_new(opts, address)
 end
 
 return M
-

@@ -91,4 +91,3 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
 end
 
 return M
-
