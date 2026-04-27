@@ -9,6 +9,7 @@
 ---@field game_id string The game ID
 
 local M = {}
+local constants = require("razz.constants")
 local notes = require("razz.notes")
 local notes_buffer = require("razz.notes.buffer")
 
@@ -74,7 +75,8 @@ function M.show(opts)
     local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
     local first_line = unescaped:match("^[^\n]*")
     local prefix = note:is_local() and "*" or ""
-    local ordinal = note.address .. " " .. note.user .. " " .. first_line
+    local user_display = note.user or constants.LOCAL_NOTE_LABEL
+    local ordinal = note.address .. " " .. user_display .. " " .. first_line
 
     return {
       value = note,
@@ -100,9 +102,13 @@ function M.show(opts)
       local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
       local lines = {
         "Address: " .. note.address,
-        "User: " .. note.user,
-        "",
       }
+      if note.user then
+        table.insert(lines, "User: " .. note.user)
+      else
+        table.insert(lines, constants.LOCAL_NOTE_LABEL)
+      end
+      table.insert(lines, "")
       vim.list_extend(lines, vim.split(unescaped, "\n"))
       vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
       vim.bo[self.state.bufnr].filetype = "ranote"

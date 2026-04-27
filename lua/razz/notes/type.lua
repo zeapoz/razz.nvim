@@ -36,7 +36,7 @@ end
 --- Checks if the note is a local user note.
 ---@return boolean True if the note is local, false otherwise
 function CodeNote:is_local()
-  return self.user == constants.LOCAL_USER_LABEL
+  return self.user == nil
 end
 
 --- Parses a note from a serialized line.
@@ -52,7 +52,7 @@ function CodeNote:from_line(line)
   return self:new({
     address = normalized_addr,
     content = unescaped,
-    user = constants.LOCAL_USER_LABEL,
+    user = nil,
   })
 end
 
@@ -77,7 +77,7 @@ function CodeNote:new_note(address, content)
   return self:new({
     address = normalized_addr,
     content = content or "",
-    user = constants.LOCAL_USER_LABEL,
+    user = nil,
   })
 end
 
@@ -90,7 +90,7 @@ function CodeNote:from_buffer_content(address, buffer_content)
   return self:new({
     address = normalized_addr,
     content = buffer_content,
-    user = constants.LOCAL_USER_LABEL,
+    user = nil,
   })
 end
 
