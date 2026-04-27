@@ -76,13 +76,13 @@ function M.show(opts)
     local first_line = unescaped:match("^[^\n]*")
     local prefix = note:is_local() and "*" or ""
     local user_display = note.user or constants.LOCAL_NOTE_LABEL
-    local ordinal = note.address .. " " .. user_display .. " " .. first_line
+    local ordinal = note:format_address() .. " " .. user_display .. " " .. first_line
 
     return {
       value = note,
       display = function()
         return displayer({
-          { note.address, "TelescopeResultsNumber" },
+          { note:format_address(), "TelescopeResultsNumber" },
           { ": " .. prefix },
           {
             first_line,
@@ -101,7 +101,7 @@ function M.show(opts)
       local note = entry.value
       local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
       local lines = {
-        "Address: " .. note.address,
+        "Address: " .. note:format_address(),
       }
       if note.user then
         table.insert(lines, "User: " .. note.user)
