@@ -21,16 +21,22 @@ function M.get_data_dir()
 end
 
 --- Gets the full data path for a game ID and file suffix.
+--- Searches all emulator directories and returns the first file that exists.
 ---@param game_id string The game ID
 ---@param suffix string The file suffix (e.g., "-Notes.json")
 ---@return string|nil The full path if successful, or nil if not configured
 ---@return string|nil Error message if not configured
 function M.get_data_path(game_id, suffix)
-  local dir, err = M.get_data_dir()
-  if not dir then
-    return nil, err
+  if #razz.config.emulator_dirs == 0 then
+    return nil, "no emulator_dirs configured"
   end
-  return dir .. game_id .. suffix
+  for _, dir in ipairs(razz.config.emulator_dirs) do
+    local full_path = M.expand_dir(dir) .. game_id .. suffix
+    if vim.fn.filereadable(full_path) ~= 0 then
+      return full_path, nil
+    end
+  end
+  return nil, "file not found in any configured emulator directory"
 end
 
 --- Gets all expanded data directories from config.
