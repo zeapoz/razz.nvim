@@ -1,7 +1,21 @@
+---@module "razz.picker"
+---@class razz.picker.ShowOpts
+---@field game_id string The game ID
+---@field notes? CodeNote[] Notes to display (loaded if not provided)
+---@field on_select? function Callback when note(s) selected
+
+---@class razz.picker.OpenOpts : razz.picker.ShowOpts
+---@field notes CodeNote[] Notes to display (required)
+---@field game_id string The game ID
+
 local M = {}
 local notes = require("razz.notes")
 local notes_buffer = require("razz.notes.buffer")
 
+--- Finds bracket-enclosed text in a string and returns highlight ranges.
+---@param text string The text to search
+---@param hl_group string The highlight group to apply
+---@return table Array of highlight entries
 local function get_brackets_highlights(text, hl_group)
   local highlights = {}
   for s, e in text:gmatch("()(%[[^]]*%])") do
@@ -10,6 +24,8 @@ local function get_brackets_highlights(text, hl_group)
   return highlights
 end
 
+--- Shows a telescope picker for notes with optional selection callback.
+---@param opts razz.picker.ShowOpts Options for the picker
 function M.show(opts)
   local ok, _ = pcall(require, "telescope")
   if not ok then
@@ -144,6 +160,9 @@ function M.show(opts)
   pickers.new({}, picker_opts):find()
 end
 
+--- Opens the notes picker with pre-loaded notes.
+--- Shorthand for M.show with notes already loaded.
+---@param opts razz.picker.OpenOpts Options for the picker
 function M.open(opts)
   local opts_notes = opts.notes
 

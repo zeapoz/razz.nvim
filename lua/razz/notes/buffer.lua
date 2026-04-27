@@ -1,7 +1,15 @@
+---@module "razz.notes.buffer"
 local M = {}
 local notes = require("razz.notes")
 local CodeNote = require("razz.notes.type")
 
+--- Opens a buffer for editing a note.
+--- Creates a new buffer or focuses an existing one for the given note.
+---@param note CodeNote The note to edit
+---@param game_id string The game ID
+---@param prev_winnr? number Previous window number to return to
+---@param focus? boolean Whether to focus the buffer (default: true)
+---@return number The buffer handle
 function M.open_buffer(note, game_id, prev_winnr, focus)
   local note_addr = note.address
   local note_content = note.content:gsub("\\r", "\r"):gsub("\\n", "\n")
@@ -13,7 +21,7 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
     if focus then
       vim.api.nvim_win_set_buf(0, existing_buf)
     end
-    return
+    return 0
   end
 
   local buf = vim.api.nvim_create_buf(true, false)
@@ -79,7 +87,9 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
   vim.api.nvim_create_autocmd("BufUnload", {
     buffer = buf,
     callback = function()
-      vim.api.nvim_set_current_win(prev_winnr)
+      if prev_winnr then
+        vim.api.nvim_set_current_win(prev_winnr)
+      end
     end,
   })
 
