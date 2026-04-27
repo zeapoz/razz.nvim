@@ -33,6 +33,12 @@ function CodeNote:format_address()
   return string.format(constants.ADDRESS_FORMAT, num)
 end
 
+--- Gets the unescaped content for display.
+---@return string The unescaped content
+function CodeNote:get_display_content()
+  return self.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
+end
+
 --- Checks if the note is a local user note.
 ---@return boolean True if the note is local, false otherwise
 function CodeNote:is_local()

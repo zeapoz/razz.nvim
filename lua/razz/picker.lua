@@ -72,7 +72,7 @@ function M.show(opts)
   })
 
   local entry_maker = function(note)
-    local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
+    local unescaped = note:get_display_content()
     local first_line = unescaped:match("^[^\n]*")
     local prefix = note:is_local() and "*" or ""
     local user_display = note.user or constants.LOCAL_NOTE_LABEL
@@ -99,7 +99,7 @@ function M.show(opts)
   local previewer = previewers.new_buffer_previewer({
     define_preview = function(self, entry, _)
       local note = entry.value
-      local unescaped = note.content:gsub("\\r", "\r"):gsub("\\n", "\n"):gsub("\r\n", "\n")
+      local unescaped = note:get_display_content()
       local lines = {
         "Address: " .. note:format_address(),
       }
