@@ -71,12 +71,12 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
 
       if not server_note and current_content == "" then
         notes.delete_local(game_id, note_addr)
-        vim.notify("Empty note discarded: " .. note_addr)
+        vim.notify("Empty note discarded: " .. note:format_address())
         update_buf_name(buf, note)
       elseif server_note_content and current_content == server_note_content then
         local ok, err = notes.delete_local(game_id, note_addr)
         if ok then
-          vim.notify("Note matches server, removed local: " .. note_addr)
+          vim.notify("Note matches server, removed local: " .. note:format_address())
           update_buf_name(buf, note)
         else
           vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
@@ -87,9 +87,9 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
         if ok then
           update_buf_name(buf, note)
           if server_note_content then
-            vim.notify("Updated note: " .. note_addr)
+            vim.notify("Updated note: " .. note:format_address())
           else
-            vim.notify("Added new note: " .. note_addr)
+            vim.notify("Added new note: " .. note:format_address())
           end
         else
           vim.notify("Export failed: " .. err, vim.log.levels.ERROR)

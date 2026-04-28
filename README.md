@@ -57,11 +57,11 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 
 If the current buffer is a `rascript` file, the game ID will be auto-detected from the current buffer's header line (e.g., `#ID = 14426`).
 
-To explicitly specify a game ID you may use:
+To explicitly specify a game ID:
 
 ```lua
-notes.open({ game_id = "14426" })
-notes.create_new({ game_id = "14426" }, "0x00001234")
+notes.open(14426)
+notes.create_new(0x00001234, 14426)
 ```
 
 ## License

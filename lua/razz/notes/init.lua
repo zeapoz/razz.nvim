@@ -2,10 +2,6 @@
 ---@class razz.notes._FindLineOpts
 ---@field find_insert_pos? boolean If true, returns insert position instead of exact match
 
----@class razz.notes.OpenOpts
----@field game_id? string The game ID
-
----@class razz.notes.CreateNewOpts : razz.notes.OpenOpts
 local M = {}
 local _server_notes_cache = {}
 local constants = require("razz.constants")
@@ -142,15 +138,10 @@ end
 
 --- Finds the line index for a given address in the notes file.
 ---@param lines string[] The lines from the notes file
----@param addr string The address to find
+---@param addr number The address to find
 ---@param opts? razz.notes._FindLineOpts Optional settings
 ---@return number|nil The line index, or nil if not found
 function M._find_line_idx_by_addr(lines, addr, opts)
-  local addr_num = tonumber(addr, 16)
-  if not addr_num then
-    return nil
-  end
-
   local find_insert_pos = opts and opts.find_insert_pos
   local insert_pos = #lines + 1
 
@@ -158,10 +149,10 @@ function M._find_line_idx_by_addr(lines, addr, opts)
     local line_addr = lines[i]:match(constants.NOTE_LINE_PATTERN)
     if line_addr then
       local line_addr_num = tonumber(line_addr, 16)
-      if line_addr_num == addr_num then
+      if line_addr_num == addr then
         return i
       end
-      if find_insert_pos and line_addr_num > addr_num and i < insert_pos then
+      if find_insert_pos and line_addr_num > addr and i < insert_pos then
         insert_pos = i
       end
     end
@@ -202,7 +193,7 @@ end
 
 --- Deletes a local note by address.
 ---@param game_id string The game ID
----@param address string The note address to delete
+---@param address number The note address to delete
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
 function M.delete_local(game_id, address)
@@ -232,56 +223,56 @@ function M.export(game_id, note)
 end
 
 --- Opens the notes picker with all notes (server and local).
----@param opts? razz.notes.OpenOpts Options containing game_id
-function M.open(opts)
-  local game_id, err = razz.get_game_id_or_error(opts)
-  if not game_id or err then
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open(game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
     if err then
       vim.notify(err, vim.log.levels.ERROR)
     end
     return
   end
 
-  local notes_list = M.get_all(game_id)
-  require("razz.picker").open({ game_id = game_id, notes = notes_list })
+  local notes_list = M.get_all(resolved_game_id)
+  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
 --- Opens the notes picker with local notes only.
----@param opts? razz.notes.OpenOpts Options containing game_id
-function M.open_local(opts)
-  local game_id, err = razz.get_game_id_or_error(opts)
-  if not game_id or err then
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open_local(game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
     if err then
       vim.notify(err, vim.log.levels.ERROR)
     end
     return
   end
 
-  local notes_list = M.load_from_local(game_id)
-  require("razz.picker").open({ game_id = game_id, notes = notes_list })
+  local notes_list = M.load_from_local(resolved_game_id)
+  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
 --- Opens the notes picker with server notes only.
----@param opts? razz.notes.OpenOpts Options containing game_id
-function M.open_server(opts)
-  local game_id, err = razz.get_game_id_or_error(opts)
-  if not game_id or err then
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open_server(game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
     if err then
       vim.notify(err, vim.log.levels.ERROR)
     end
     return
   end
 
-  local notes_list = M.load_from_server(game_id)
-  require("razz.picker").open({ game_id = game_id, notes = notes_list })
+  local notes_list = M.load_from_server(resolved_game_id)
+  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
 --- Creates a new note at the given address or prompts for one.
----@param opts? razz.notes.CreateNewOpts Options containing game_id
----@param address? string Optional address to create note at
-function M.create_new(opts, address)
-  local game_id, err = razz.get_game_id_or_error(opts)
-  if not game_id or err then
+---@param address? number Optional address to create note at
+---@param game_id? string|number The game ID (or nil to infer)
+function M.create_new(address, game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
     if err then
       vim.notify(err, vim.log.levels.ERROR)
     end
@@ -290,7 +281,7 @@ function M.create_new(opts, address)
 
   local function do_create(addr)
     local note = CodeNote:new_note(addr, "")
-    require("razz.notes.buffer").open_buffer(note, game_id, nil, true)
+    require("razz.notes.buffer").open_buffer(note, resolved_game_id, nil, true)
   end
 
   if address then
@@ -298,31 +289,31 @@ function M.create_new(opts, address)
   else
     vim.ui.input({ prompt = "Address: " }, function(input)
       if input and input ~= "" then
-        do_create(input)
+        do_create(tonumber(input, 16))
       end
     end)
   end
 end
 
 --- Creates and exports a note to the local notes file.
----@param opts string|table Options containing game_id
----@param address string The memory address
+---@param address number The memory address
 ---@param lines string[] Array of lines
+---@param game_id? string|number The game ID (or nil to infer)
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
-function M.create_new_with_content(opts, address, lines)
+function M.create_new_with_content(address, lines, game_id)
   if not lines or #lines == 0 then
     return false, "no content provided"
   end
 
-  local validated_game_id, err = razz.get_game_id_or_error(opts)
-  if not validated_game_id or err then
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
     return false, err or "invalid game_id"
   end
 
   local content = table.concat(lines, "\r\n")
   local note = CodeNote:new_note(address, content)
-  return M._write_local_note(validated_game_id, note)
+  return M._write_local_note(resolved_game_id, note)
 end
 
 return M

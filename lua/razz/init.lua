@@ -18,21 +18,21 @@ function M.ensure_configured()
 end
 
 --- Gets the game ID from options or infers from the current buffer.
----@param opts? string|table Either a game ID string or { game_id = "..." }
+---@param game_id? string|number The game ID (string, number, or nil to infer)
 ---@return string|nil The game ID, or nil if not found
 ---@return string|nil Error message if not found
-function M.get_game_id_or_error(opts)
-  if type(opts) == "string" then
-    return opts, nil
+function M.get_game_id_or_error(game_id)
+  if game_id then
+    if type(game_id) == "number" then
+      return tostring(game_id), nil
+    end
+    return game_id, nil
   end
-  if opts and opts.game_id then
-    return opts.game_id, nil
-  end
-  local game_id = M._infer_current_game_id()
-  if not game_id then
+  local inferred = M._infer_current_game_id()
+  if not inferred then
     return nil, "Could not detect game ID from current buffer"
   end
-  return game_id, nil
+  return inferred, nil
 end
 
 --- Infers the game ID from the current buffer's header.
