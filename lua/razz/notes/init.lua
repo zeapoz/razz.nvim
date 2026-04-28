@@ -304,4 +304,25 @@ function M.create_new(opts, address)
   end
 end
 
+--- Creates and exports a note to the local notes file.
+---@param opts string|table Options containing game_id
+---@param address string The memory address
+---@param lines string[] Array of lines
+---@return boolean True if successful
+---@return string|nil Error message if failed
+function M.create_new_with_content(opts, address, lines)
+  if not lines or #lines == 0 then
+    return false, "no content provided"
+  end
+
+  local validated_game_id, err = razz.get_game_id_or_error(opts)
+  if not validated_game_id or err then
+    return false, err or "invalid game_id"
+  end
+
+  local content = table.concat(lines, "\r\n")
+  local note = CodeNote:new_note(address, content)
+  return M._write_local_note(validated_game_id, note)
+end
+
 return M
