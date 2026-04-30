@@ -12,7 +12,7 @@ local ServerNote = require("razz.notes.types.server")
 
 --- Loads notes from the server for a given game.
 ---@param game_id string The game ID
----@return CodeNote[] Array of notes from the server
+---@return ServerNote[] Array of notes from the server
 ---@return string|nil Error message if failed
 function M.load_from_server(game_id)
   if _server_notes_cache[game_id] then
@@ -38,7 +38,7 @@ function M.load_from_server(game_id)
   for _, json_note in ipairs(json_notes) do
     local note, err = ServerNote.parse_json(json_note)
     if not note then
-      vim.notify("failed to parse note: " .. err, vim.log.levels.WARN)
+      vim.notify("Failed to parse note: " .. err, vim.log.levels.WARN)
     else
       table.insert(notes, note)
     end
@@ -56,6 +56,63 @@ function M.clear_server_cache(game_id)
   else
     _server_notes_cache = {}
   end
+end
+
+--- Marks a note as synced by updating server JSON and removing local note.
+---@param game_id string The game ID
+---@param address number The note address
+---@param content string The note content
+---@return boolean True if successful
+---@return string|nil Error message if failed
+function M.mark_synced(game_id, address, content)
+  local data_path, path_err = storage.get_data_path(game_id, constants.SERVER_NOTES_SUFFIX)
+  if not data_path then
+    return false, path_err
+  end
+
+  local server_notes = M.load_from_server(game_id)
+  local username = storage.get_username()
+  if not username then
+    return false, "not logged in"
+  end
+
+  local found = false
+  for _, note in ipairs(server_notes) do
+    if note.address == address then
+      note.content = content
+      note.user = username
+      found = true
+      break
+    end
+  end
+
+  if not found then
+    local new_note, err = ServerNote:new(address, content, username)
+    if not new_note then
+      return false, err
+    end
+    table.insert(server_notes, new_note)
+  end
+
+  local json_notes = {}
+  for _, note in ipairs(server_notes) do
+    table.insert(json_notes, note:serialize_json())
+  end
+
+  local ok_json, json_str = pcall(vim.json.encode, json_notes)
+  if not ok_json then
+    return false, "failed to encode JSON"
+  end
+
+  local ok_write = pcall(vim.fn.writefile, vim.split(json_str, "\n"), data_path)
+  if not ok_write then
+    return false, "failed to write server notes"
+  end
+
+  _server_notes_cache[game_id] = server_notes
+  M.delete_local(game_id, address)
+
+  return true
 end
 
 --- Loads local notes from the user notes file.

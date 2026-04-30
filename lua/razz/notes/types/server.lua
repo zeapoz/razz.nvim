@@ -31,4 +31,14 @@ function ServerNote.parse_json(json)
   return ServerNote:new(addr, json.Note or "", json.User)
 end
 
+--- Serializes the note to JSON format.
+---@return table The JSON-serializable table
+function ServerNote:serialize_json()
+  return {
+    Address = self:format_address(),
+    Note = CodeNote.escaped(self.content),
+    User = self.user,
+  }
+end
+
 return ServerNote

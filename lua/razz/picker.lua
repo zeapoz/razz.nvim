@@ -31,7 +31,7 @@ end
 function M.show(opts)
   local ok, _ = pcall(require, "telescope")
   if not ok then
-    vim.notify("telescope not installed", vim.log.levels.ERROR)
+    vim.notify("Telescope not installed", vim.log.levels.ERROR)
     return
   end
 
@@ -41,7 +41,7 @@ function M.show(opts)
 
   if not opts_notes then
     if not game_id then
-      vim.notify("show requires either notes or game_id", vim.log.levels.ERROR)
+      vim.notify("Show requires either notes or game_id", vim.log.levels.ERROR)
       return
     end
     opts_notes = notes.get_all(game_id)
@@ -176,7 +176,7 @@ function M.open(opts)
   local opts_notes = opts.notes
 
   if not opts_notes then
-    vim.notify("open requires notes", vim.log.levels.ERROR)
+    vim.notify("Open requires notes", vim.log.levels.ERROR)
     return
   end
 

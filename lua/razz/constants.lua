@@ -16,6 +16,7 @@ local M = {
   HEADER_LINE_COUNT = 3,
   LOCAL_NOTE_LABEL = "Local Note",
   ADDRESS_FORMAT = "0x%08x",
+  SESSION_FILE = "razz/session.json",
 }
 
 return M
