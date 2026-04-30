@@ -12,6 +12,7 @@ local M = {}
 local constants = require("razz.constants")
 local notes = require("razz.notes")
 local notes_buffer = require("razz.notes.buffer")
+local LocalNote = require("razz.notes.types.local")
 
 --- Finds bracket-enclosed text in a string and returns highlight ranges.
 ---@param text string The text to search
@@ -74,8 +75,9 @@ function M.show(opts)
   local entry_maker = function(note)
     local unescaped = note:get_display_content()
     local first_line = unescaped:match("^[^\n]*")
-    local prefix = note:is_local() and "*" or ""
-    local user_display = note.user or constants.LOCAL_NOTE_LABEL
+    local is_local = getmetatable(note) == LocalNote
+    local prefix = is_local and "*" or ""
+    local user_display = is_local and constants.LOCAL_NOTE_LABEL or note.user
     local ordinal = note:format_address() .. " " .. user_display .. " " .. first_line
 
     return {
@@ -103,10 +105,11 @@ function M.show(opts)
       local lines = {
         "Address: " .. note:format_address(),
       }
-      if note.user then
-        table.insert(lines, "User: " .. note.user)
-      else
+      local is_local = getmetatable(note) == LocalNote
+      if is_local then
         table.insert(lines, constants.LOCAL_NOTE_LABEL)
+      else
+        table.insert(lines, "User: " .. note.user)
       end
       table.insert(lines, "")
       vim.list_extend(lines, vim.split(unescaped, "\n"))

@@ -1,7 +1,7 @@
 ---@module "razz.notes.buffer"
 local M = {}
 local notes = require("razz.notes")
-local CodeNote = require("razz.notes.type")
+local LocalNote = require("razz.notes.types.local")
 local constants = require("razz.constants")
 
 local function compute_buf_name(note, first_line)
@@ -82,7 +82,7 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
           vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
         end
       else
-        local export_note = CodeNote:from_buffer_content(note_addr, current_content)
+        local export_note = LocalNote:new(note_addr, current_content)
         local ok, err = notes.export(game_id, export_note)
         if ok then
           update_buf_name(buf, note)

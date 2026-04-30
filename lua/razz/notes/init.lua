@@ -7,7 +7,8 @@ local _server_notes_cache = {}
 local constants = require("razz.constants")
 local storage = require("razz.storage")
 local razz = require("razz")
-local CodeNote = require("razz.notes.type")
+local LocalNote = require("razz.notes.types.local")
+local ServerNote = require("razz.notes.types.server")
 
 --- Loads notes from the server for a given game.
 ---@param game_id string The game ID
@@ -35,7 +36,12 @@ function M.load_from_server(game_id)
 
   local notes = {}
   for _, json_note in ipairs(json_notes) do
-    table.insert(notes, CodeNote:from_server(json_note))
+    local note, err = ServerNote.parse_json(json_note)
+    if not note then
+      vim.notify("failed to parse note: " .. err, vim.log.levels.WARN)
+    else
+      table.insert(notes, note)
+    end
   end
 
   _server_notes_cache[game_id] = notes
@@ -75,7 +81,7 @@ function M.load_from_local(game_id)
   local notes = {}
 
   for i = constants.HEADER_LINE_COUNT, #lines do
-    local note = CodeNote:from_line(lines[i])
+    local note = LocalNote.parse_line(lines[i])
     if note then
       table.insert(notes, note)
     end
@@ -280,7 +286,7 @@ function M.create_new(address, game_id)
   end
 
   local function do_create(addr)
-    local note = CodeNote:new_note(addr, "")
+    local note = LocalNote:new(addr, "")
     require("razz.notes.buffer").open_buffer(note, resolved_game_id, nil, true)
   end
 
@@ -312,7 +318,7 @@ function M.create_new_with_content(address, lines, game_id)
   end
 
   local content = table.concat(lines, "\r\n")
-  local note = CodeNote:new_note(address, content)
+  local note = LocalNote:new(address, content)
   return M._write_local_note(resolved_game_id, note)
 end
 
