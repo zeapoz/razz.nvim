@@ -66,6 +66,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | Keymap | Default | Description |
 |--------|---------|-------------|
 | `keys.publish` | `<localleader>p` | Publish current local note to the RetroAchievements server |
+| `keys.revert` | `<localleader>r` | Revert local note to server version |
 
 ## Usage
 

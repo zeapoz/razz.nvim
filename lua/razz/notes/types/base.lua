@@ -1,4 +1,4 @@
-local constants = require("razz.constants")
+local util = require("razz.util")
 
 --- Base class for all note types.
 ---@class CodeNote
@@ -17,10 +17,10 @@ function CodeNote:new(address, content)
   return obj
 end
 
---- Formats the address as a padded uppercase hex string.
+--- Formats the address as a padded lowercase hex string.
 ---@return string The formatted address (e.g., "0x00001234")
 function CodeNote:format_address()
-  return string.format(constants.ADDRESS_FORMAT, self.address)
+  return util.format_hex_address(self.address)
 end
 
 --- Unescapes note content for display.

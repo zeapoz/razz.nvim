@@ -3,7 +3,6 @@
 ---@field find_insert_pos? boolean If true, returns insert position instead of exact match
 
 local M = {}
-local constants = require("razz.constants")
 local storage = require("razz.storage")
 local razz = require("razz")
 local LocalNote = require("razz.notes.types.local")
@@ -82,7 +81,7 @@ end
 
 --- Exports a note to the local notes file.
 ---@param game_id string The game ID
----@param note CodeNote The note to export
+---@param note LocalNote The note to export
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
 function M.export(game_id, note)
