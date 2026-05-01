@@ -4,6 +4,12 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 
 ![Screenshot](assets/screenshot.png)
 
+## Features
+
+- Browse local and server code notes
+- Publish local notes to the RetroAchievements server
+- Telescope picker integration
+
 ## Prerequisites
 
 - Neovim 0.9+
@@ -30,6 +36,11 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
   opts = {
     emulator_dirs = { "/path/to/emulator_dir" },
   },
+  config = function(_, opts)
+    local razz = require("razz")
+    razz.setup(opts)
+    razz.login() -- Required to push notes to the server
+  end,
   keys = function()
     local notes = require("razz.notes")
     return {
@@ -42,14 +53,28 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 }
 ```
 
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `emulator_dirs` | table | `{}` | Required. List of paths to emulator directories (containing `RACache/Data/`) |
+
+### Buffer Local Keymaps
+
+| Keymap | Default | Description |
+|--------|---------|-------------|
+| `keys.publish` | `<localleader>p` | Publish current local note to the RetroAchievements server |
+
 ## Usage
 
-| Keybinding | Function |
-|------------|-----------|
-| `<leader>co` | Open all notes (server + local) |
-| `<leader>cl` | Open local notes only |
-| `<leader>cs` | Open server notes only |
-| `<leader>cn` | Create a new note |
+| Function | Options | Description |
+|----------|---------|-------------|
+| `notes.open()` | `game_id?` | Open all notes (server + local) |
+| `notes.open_local()` | `game_id?` | Open local notes only |
+| `notes.open_server()` | `game_id?` | Open server notes only |
+| `notes.create_new()` | `address?`, `game_id?` | Create a new note |
+| `notes.create_new_with_content()` | `address`, `lines`, `game_id?` | Create note with content |
+| `notes.publish()` | - | Publish local note to server |
 
 `<Enter>` opens the selected note. `<C-x>`/`<C-v>` opens in a split. Select multiple notes with `<Tab>`.
 
