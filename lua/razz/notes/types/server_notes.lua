@@ -83,7 +83,33 @@ function ServerNotes:serialize_json()
   return json_notes
 end
 
---- Saves notes to file.
+--- Saves notes to file asynchronously.
+---@param callback fun(success: boolean, err: string|nil)
+function ServerNotes:save_async(callback)
+  storage.pick_data_path(self.game_id, constants.SERVER_NOTES_SUFFIX, function(data_path, path_err)
+    if not data_path then
+      callback(false, path_err)
+      return
+    end
+
+    local json_notes = self:serialize_json()
+    local ok_json, json_str = pcall(vim.json.encode, json_notes)
+    if not ok_json then
+      callback(false, "failed to encode JSON")
+      return
+    end
+
+    local ok_write = pcall(vim.fn.writefile, vim.split(json_str, "\n"), data_path)
+    if not ok_write then
+      callback(false, "failed to write server notes")
+      return
+    end
+
+    callback(true, nil)
+  end)
+end
+
+--- Saves notes to file (synchronous, for existing files).
 ---@return boolean True on success
 ---@return string|nil Error message on failure
 function ServerNotes:save()
@@ -104,6 +130,38 @@ function ServerNotes:save()
   end
 
   return true, nil
+end
+
+--- Downloads server notes from the server.
+---@param game_id string
+function ServerNotes.fetch_from_server(game_id)
+  local ra_client = require("razz.ra_client")
+
+  ra_client.fetch_notes(game_id, function(json_notes, err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR)
+      return
+    end
+
+    local notes = {}
+    for _, json_note in ipairs(json_notes) do
+      local note, note_err = ServerNote.parse_json(json_note)
+      if not note then
+        vim.notify("Failed to parse note: " .. note_err, vim.log.levels.WARN)
+      else
+        table.insert(notes, note)
+      end
+    end
+
+    local self = setmetatable({ game_id = game_id, notes = notes }, { __index = ServerNotes })
+
+    self:save_async(function(ok, save_err)
+      if not ok then
+        vim.notify("Failed to save: " .. save_err, vim.log.levels.WARN)
+      end
+      vim.notify("Fetched " .. #notes .. " notes", vim.log.levels.INFO)
+    end)
+  end)
 end
 
 return ServerNotes

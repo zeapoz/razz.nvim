@@ -39,6 +39,61 @@ function M.get_data_path(game_id, suffix)
   return nil, "file not found in any configured emulator directory"
 end
 
+--- Prompts user to choose a directory for a new file.
+--- Checks for existing file first - if found, returns that path. Otherwise prompts user.
+---@param game_id string The game ID
+---@param suffix string The file suffix
+---@param callback fun(path: string|nil, err: string|nil)
+function M.pick_data_path(game_id, suffix, callback)
+  vim.schedule(function()
+    local existing_path, _ = M.get_data_path(game_id, suffix)
+    if existing_path then
+      callback(existing_path, nil)
+      return
+    end
+
+    if #config.emulator_dirs == 0 then
+      callback(nil, "no emulator_dirs configured")
+      return
+    end
+
+    local paths = {}
+    for _, dir in ipairs(config.emulator_dirs) do
+      local expanded = M.expand_dir(dir)
+      table.insert(paths, { dir = dir, path = expanded .. game_id .. suffix })
+    end
+
+    local choices = {}
+    for _, p in ipairs(paths) do
+      table.insert(choices, p.dir)
+    end
+
+    vim.ui.select(choices, {
+      prompt = "Choose directory for new file:",
+      format_item = function(item)
+        return item
+      end,
+    }, function(choice)
+      if not choice then
+        callback(nil, "cancelled")
+        return
+      end
+
+      for _, p in ipairs(paths) do
+        if p.dir == choice then
+          local ok_mkdir = pcall(vim.fn.mkdir, vim.fn.fnamemodify(p.path, ":p:h"), "p")
+          if not ok_mkdir then
+            callback(nil, "failed to create directory")
+            return
+          end
+          callback(p.path, nil)
+          return
+        end
+      end
+    end)
+  end)
+end
+
 --- Gets all expanded data directories from config.
 ---@return string[] Array of expanded data directory paths
 function M.get_data_paths()

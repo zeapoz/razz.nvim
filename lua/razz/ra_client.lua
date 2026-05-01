@@ -146,4 +146,23 @@ function M.publish_note(game_id, address, note, on_success)
   _do_publish(game_id, address, note, on_success)
 end
 
+--- Fetches code notes for a game from the server.
+---@param game_id number|string
+---@param callback fun(notes: table|nil, err: string|nil)
+function M.fetch_notes(game_id, callback)
+  local post_data = string.format("r=codenotes2&g=%s", tostring(game_id))
+
+  _request(post_data, function(response, err)
+    if err then
+      callback(nil, err)
+      return
+    end
+    if not response or not response.CodeNotes then
+      callback(nil, "invalid response")
+      return
+    end
+    callback(response.CodeNotes, nil)
+  end)
+end
+
 return M

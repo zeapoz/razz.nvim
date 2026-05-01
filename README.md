@@ -47,6 +47,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
       { "<leader>co", function() notes.open() end, desc = "Open code note" },
       { "<leader>cl", function() notes.open_local() end, desc = "Open local note" },
       { "<leader>cs", function() notes.open_server() end, desc = "Open server note" },
+      { "<leader>cf", function() notes.fetch_server() end, desc = "Fetch server notes" },
       { "<leader>cn", function() notes.create_new() end, desc = "Create new note" },
     }
   end,
@@ -72,6 +73,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.open()` | `game_id?` | Open all notes (server + local) |
 | `notes.open_local()` | `game_id?` | Open local notes only |
 | `notes.open_server()` | `game_id?` | Open server notes only |
+| `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
 | `notes.create_new()` | `address?`, `game_id?` | Create a new note |
 | `notes.create_new_with_content()` | `address`, `lines`, `game_id?` | Create note with content |
 | `notes.publish()` | - | Publish local note to server |

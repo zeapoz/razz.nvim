@@ -142,6 +142,20 @@ function M.open_server(game_id)
   require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
+--- Fetches server notes from the server.
+---@param game_id? string|number The game ID (or nil to infer)
+function M.fetch_server(game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
+    if err then
+      vim.notify(err, vim.log.levels.ERROR)
+    end
+    return
+  end
+
+  ServerNotes.fetch_from_server(resolved_game_id)
+end
+
 --- Creates a new note at the given address or prompts for one.
 ---@param address? number Optional address to create note at
 ---@param game_id? string|number The game ID (or nil to infer)
