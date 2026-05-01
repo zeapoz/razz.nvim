@@ -49,6 +49,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
       { "<leader>cs", function() notes.open_server() end, desc = "Open server note" },
       { "<leader>cf", function() notes.fetch_server() end, desc = "Fetch server notes" },
       { "<leader>cn", function() notes.open_new() end, desc = "Open new note" },
+      { "<leader>ca", function() notes.publish_all() end, desc = "Publish all local notes" },
     }
   end,
 }
@@ -77,6 +78,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
 | `notes.publish()` | - | Publish local note to server |
+| `notes.publish_all()` | `game_id?` | Publish all local notes to the server sequentially |
 
 `<Enter>` opens the selected note. `<C-x>`/`<C-v>` opens in a split. Select multiple notes with `<Tab>`.
 

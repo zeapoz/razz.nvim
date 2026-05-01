@@ -36,7 +36,7 @@ end
 function ServerNote:serialize_json()
   return {
     Address = self:format_address(),
-    Note = CodeNote.escaped(self.content),
+    Note = self.content,
     User = self.user,
   }
 end

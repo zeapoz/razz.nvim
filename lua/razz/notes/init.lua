@@ -184,6 +184,55 @@ function M.open_new(address, game_id)
   end
 end
 
+--- Publishes all local notes to the server sequentially.
+---@param game_id? string|number The game ID (or nil to infer)
+function M.publish_all(game_id)
+  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+  if not resolved_game_id or err then
+    if err then
+      vim.notify(err, vim.log.levels.ERROR)
+    end
+    return
+  end
+
+  local local_notes_obj, load_err = LocalNotes.load(resolved_game_id)
+  if not local_notes_obj then
+    vim.notify("Failed to load local notes: " .. load_err, vim.log.levels.ERROR)
+    return
+  end
+
+  local notes = local_notes_obj.notes
+  local count = #notes
+  if count == 0 then
+    vim.notify("No local notes to publish", vim.log.levels.WARN)
+    return
+  end
+
+  local prompt_msg = string.format("Upload %d local code note%s? ", count, count == 1 and "" or "s")
+  local confirm = vim.fn.confirm(prompt_msg, "&Yes\n&No", 1)
+  if confirm ~= 1 then
+    return
+  end
+
+  local function publish_next(index)
+    if index > count then
+      vim.notify("All notes published", vim.log.levels.INFO)
+      return
+    end
+
+    local note = notes[index]
+    local note_to_publish = LocalNote:new(note.address, note.content)
+
+    note_to_publish:publish(resolved_game_id, nil)
+
+    vim.defer_fn(function()
+      publish_next(index + 1)
+    end, 500)
+  end
+
+  publish_next(1)
+end
+
 --- Creates and exports a note to the local notes file.
 ---@param address number The memory address
 ---@param lines string[] Array of lines
