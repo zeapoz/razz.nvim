@@ -20,6 +20,19 @@ local function update_buf_name(buf, note, game_id)
   vim.api.nvim_buf_set_name(buf, buf_name)
 end
 
+--- Gets the game ID from a buffer's local variable.
+---@param buf? number Buffer handle, defaults to current buffer
+---@return string|nil The game ID, or nil if not set
+---@return string|nil Error message if not set
+function M.get_buffer_game_id(buf)
+  local target_buf = buf or vim.api.nvim_get_current_buf()
+  local ok, game_id = pcall(vim.api.nvim_buf_get_var, target_buf, "game_id")
+  if ok and game_id then
+    return game_id
+  end
+  return nil, "game_id not set on buffer"
+end
+
 --- Opens a buffer for editing a note.
 --- Creates a new buffer or focuses an existing one for the given note.
 ---@param note CodeNote The note to edit

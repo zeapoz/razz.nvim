@@ -159,7 +159,7 @@ end
 --- Creates a new note at the given address or prompts for one.
 ---@param address? number Optional address to create note at
 ---@param game_id? string|number The game ID (or nil to infer)
-function M.create_new(address, game_id)
+function M.open_new(address, game_id)
   local resolved_game_id, err = razz.get_game_id_or_error(game_id)
   if not resolved_game_id or err then
     if err then
@@ -190,10 +190,8 @@ end
 ---@param game_id? string|number The game ID (or nil to infer)
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
-function M.create_new_with_content(address, lines, game_id)
-  if not lines or #lines == 0 then
-    return false, "no content provided"
-  end
+function M.create_new(address, lines, game_id)
+  lines = lines or {}
 
   local resolved_game_id, err = razz.get_game_id_or_error(game_id)
   if not resolved_game_id or err then

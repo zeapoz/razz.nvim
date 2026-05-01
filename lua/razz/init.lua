@@ -20,26 +20,17 @@ end
 function M.get_game_id_or_error(game_id)
   if game_id then
     if type(game_id) == "number" then
-      return tostring(game_id), nil
+      return tostring(game_id)
     end
-    return game_id, nil
+    return game_id
   end
-  local inferred = M._infer_current_game_id()
-  if not inferred then
-    return nil, "Could not detect game ID from current buffer"
+  local notes_buffer = require("razz.notes.buffer")
+  local buffer_game_id = notes_buffer.get_buffer_game_id()
+  if buffer_game_id then
+    return buffer_game_id
   end
-  return inferred, nil
-end
-
---- Infers the game ID from the current buffer's content.
----@return string|nil The inferred game ID, or nil if not found
-function M._infer_current_game_id()
-  local lines = vim.api.nvim_buf_get_lines(0, 0, 2, false)
-  if #lines < 2 then
-    return nil
-  end
-  local id = lines[2]:match("#ID%s*=%s*(%d+)")
-  return id
+  local tools = require("razz.tools")
+  return tools.try_infer_from_buffer()
 end
 
 --- Sets up the plugin with user configuration.

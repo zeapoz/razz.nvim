@@ -48,7 +48,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
       { "<leader>cl", function() notes.open_local() end, desc = "Open local note" },
       { "<leader>cs", function() notes.open_server() end, desc = "Open server note" },
       { "<leader>cf", function() notes.fetch_server() end, desc = "Fetch server notes" },
-      { "<leader>cn", function() notes.create_new() end, desc = "Create new note" },
+      { "<leader>cn", function() notes.open_new() end, desc = "Open new note" },
     }
   end,
 }
@@ -74,21 +74,25 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.open_local()` | `game_id?` | Open local notes only |
 | `notes.open_server()` | `game_id?` | Open server notes only |
 | `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
-| `notes.create_new()` | `address?`, `game_id?` | Create a new note |
-| `notes.create_new_with_content()` | `address`, `lines`, `game_id?` | Create note with content |
+| `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
+| `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
 | `notes.publish()` | - | Publish local note to server |
 
 `<Enter>` opens the selected note. `<C-x>`/`<C-v>` opens in a split. Select multiple notes with `<Tab>`.
 
 ## Game ID
 
-If the current buffer is a `rascript` file, the game ID will be auto-detected from the current buffer's header line (e.g., `#ID = 14426`).
+The plugin detects the game ID in this order:
+
+1. Explicit parameter: Pass `game_id` directly to functions
+2. Buffer variable: `vim.b.game_id` set on the buffer (e.g., when editing notes)
+3. Infer from buffer: Scan for `#ID = XXX` in RAScript file header
 
 To explicitly specify a game ID:
 
 ```lua
 notes.open(14426)
-notes.create_new(0x00001234, 14426)
+notes.open_new(0x00001234, 14426)
 ```
 
 ## License
