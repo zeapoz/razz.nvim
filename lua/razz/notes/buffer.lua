@@ -2,6 +2,8 @@
 local M = {}
 local notes = require("razz.notes")
 local LocalNote = require("razz.notes.types.local")
+local LocalNotes = require("razz.notes.types.local_notes")
+local ServerNotes = require("razz.notes.types.server_notes")
 local config = require("razz.config")
 
 local function compute_buf_name(note, first_line, game_id)
@@ -65,27 +67,32 @@ function M.open_buffer(note, game_id, prev_winnr, focus)
       local current_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
       local current_content = table.concat(current_lines, "\r\n")
 
-      local server_notes = notes.load_from_server(game_id)
-      local server_note = nil
-      for _, n in ipairs(server_notes) do
-        if n.address == note_addr then
-          server_note = n
-          break
-        end
+      local server_notes, load_err = ServerNotes.load(game_id)
+      if not server_notes then
+        vim.notify("Failed to load server notes: " .. load_err, vim.log.levels.ERROR)
+        return
       end
+
+      local server_note = server_notes:find_by_addr(note_addr)
       local server_note_content = server_note and server_note.content or nil
 
       if not server_note and current_content == "" then
-        notes.delete_local(game_id, note_addr)
+        local local_notes = LocalNotes.load(game_id)
+        if local_notes then
+          local_notes:delete(note_addr)
+        end
         vim.notify("Empty note discarded: " .. note:format_address())
         update_buf_name(buf, note, game_id)
       elseif server_note_content and current_content == server_note_content then
-        local ok, err = notes.delete_local(game_id, note_addr)
-        if ok then
-          vim.notify("Note matches server, removed local: " .. note:format_address())
-          update_buf_name(buf, note, game_id)
-        else
-          vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
+        local local_notes = LocalNotes.load(game_id)
+        if local_notes then
+          local ok, err = local_notes:delete(note_addr)
+          if ok then
+            vim.notify("Note matches server, removed local: " .. note:format_address())
+            update_buf_name(buf, note, game_id)
+          else
+            vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
+          end
         end
       else
         local export_note = LocalNote:new(note_addr, current_content)

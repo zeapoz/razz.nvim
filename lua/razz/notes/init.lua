@@ -3,60 +3,12 @@
 ---@field find_insert_pos? boolean If true, returns insert position instead of exact match
 
 local M = {}
-local _server_notes_cache = {}
 local constants = require("razz.constants")
 local storage = require("razz.storage")
 local razz = require("razz")
 local LocalNote = require("razz.notes.types.local")
-local ServerNote = require("razz.notes.types.server")
-
---- Loads notes from the server for a given game.
----@param game_id string The game ID
----@return ServerNote[] Array of notes from the server
----@return string|nil Error message if failed
-function M.load_from_server(game_id)
-  if _server_notes_cache[game_id] then
-    return _server_notes_cache[game_id], nil
-  end
-
-  local data_path, path_err = storage.get_data_path(game_id, constants.SERVER_NOTES_SUFFIX)
-  if not data_path then
-    return {}, path_err
-  end
-  local ok, lines = pcall(vim.fn.readfile, data_path)
-  if not ok then
-    return {}, "failed to read file: " .. data_path
-  end
-
-  local content = table.concat(lines, "\n")
-  local ok_decode, json_notes = pcall(vim.json.decode, content)
-  if not ok_decode then
-    return {}, "failed to decode JSON"
-  end
-
-  local notes = {}
-  for _, json_note in ipairs(json_notes) do
-    local note, err = ServerNote.parse_json(json_note)
-    if not note then
-      vim.notify("Failed to parse note: " .. err, vim.log.levels.WARN)
-    else
-      table.insert(notes, note)
-    end
-  end
-
-  _server_notes_cache[game_id] = notes
-  return notes, nil
-end
-
---- Clears the server notes cache.
----@param game_id? string Optional game ID to clear specific cache
-function M.clear_server_cache(game_id)
-  if game_id then
-    _server_notes_cache[game_id] = nil
-  else
-    _server_notes_cache = {}
-  end
-end
+local LocalNotes = require("razz.notes.types.local_notes")
+local ServerNotes = require("razz.notes.types.server_notes")
 
 --- Marks a note as synced by updating server JSON and removing local note.
 ---@param game_id string The game ID
@@ -65,86 +17,29 @@ end
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
 function M.mark_synced(game_id, address, content)
-  local data_path, path_err = storage.get_data_path(game_id, constants.SERVER_NOTES_SUFFIX)
-  if not data_path then
-    return false, path_err
+  local server_notes, load_err = ServerNotes.load(game_id)
+  if not server_notes then
+    return false, load_err
   end
 
-  local server_notes = M.load_from_server(game_id)
   local username = storage.get_username()
   if not username then
     return false, "not logged in"
   end
 
-  local found = false
-  for _, note in ipairs(server_notes) do
-    if note.address == address then
-      note.content = content
-      note.user = username
-      found = true
-      break
-    end
+  server_notes:update_or_add(address, content, username)
+
+  local ok, save_err = server_notes:save()
+  if not ok then
+    return false, save_err
   end
 
-  if not found then
-    local new_note, err = ServerNote:new(address, content, username)
-    if not new_note then
-      return false, err
-    end
-    table.insert(server_notes, new_note)
+  local local_notes = LocalNotes.load(game_id)
+  if local_notes then
+    local_notes:delete(address)
   end
-
-  local json_notes = {}
-  for _, note in ipairs(server_notes) do
-    table.insert(json_notes, note:serialize_json())
-  end
-
-  local ok_json, json_str = pcall(vim.json.encode, json_notes)
-  if not ok_json then
-    return false, "failed to encode JSON"
-  end
-
-  local ok_write = pcall(vim.fn.writefile, vim.split(json_str, "\n"), data_path)
-  if not ok_write then
-    return false, "failed to write server notes"
-  end
-
-  _server_notes_cache[game_id] = server_notes
-  M.delete_local(game_id, address)
 
   return true
-end
-
---- Loads local notes from the user notes file.
----@param game_id string The game ID
----@return CodeNote[] Array of local notes
----@return string|nil Error message if failed
-function M.load_from_local(game_id)
-  local user_file, path_err = storage.get_data_path(game_id, constants.USER_NOTES_SUFFIX)
-  if not user_file then
-    return {}, path_err
-  end
-
-  local readable = vim.fn.filereadable(user_file)
-  if readable == 0 then
-    return {}, "file not found: " .. user_file
-  end
-
-  local ok, lines = pcall(vim.fn.readfile, user_file)
-  if not ok then
-    return {}, "failed to read file: " .. user_file
-  end
-
-  local notes = {}
-
-  for i = constants.HEADER_LINE_COUNT, #lines do
-    local note = LocalNote.parse_line(lines[i])
-    if note then
-      table.insert(notes, note)
-    end
-  end
-
-  return notes, nil
 end
 
 --- Gets all notes (server and local) for a game, merging them.
@@ -152,8 +47,10 @@ end
 ---@param game_id string The game ID
 ---@return CodeNote[] Array of all merged notes
 function M.get_all(game_id)
-  local server_notes, _ = M.load_from_server(game_id)
-  local local_notes, _ = M.load_from_local(game_id)
+  local server_notes_obj, _ = ServerNotes.load(game_id)
+  local server_notes = server_notes_obj and server_notes_obj.notes or {}
+  local local_notes_obj, _ = LocalNotes.load(game_id)
+  local local_notes = local_notes_obj and local_notes_obj.notes or {}
 
   local local_by_addr = {}
   for _, note in ipairs(local_notes) do
@@ -183,106 +80,19 @@ function M.get_all(game_id)
   return results
 end
 
---- Checks if the user notes file exists for a game.
----@param game_id string The game ID
----@return boolean True if the file exists
----@return string|nil The file path if true, or error message if false
-function M._ensure_user_file_exists(game_id)
-  local user_file, path_err = storage.get_data_path(game_id, constants.USER_NOTES_SUFFIX)
-  if not user_file then
-    return false, path_err
-  end
-  local readable = vim.fn.filereadable(user_file)
-  if readable == 0 then
-    return false, "file not found: " .. user_file
-  end
-  return true, user_file
-end
-
---- Finds the line index for a given address in the notes file.
----@param lines string[] The lines from the notes file
----@param addr number The address to find
----@param opts? razz.notes._FindLineOpts Optional settings
----@return number|nil The line index, or nil if not found
-function M._find_line_idx_by_addr(lines, addr, opts)
-  local find_insert_pos = opts and opts.find_insert_pos
-  local insert_pos = #lines + 1
-
-  for i = constants.HEADER_LINE_COUNT, #lines do
-    local line_addr = lines[i]:match(constants.NOTE_LINE_PATTERN)
-    if line_addr then
-      local line_addr_num = tonumber(line_addr, 16)
-      if line_addr_num == addr then
-        return i
-      end
-      if find_insert_pos and line_addr_num > addr and i < insert_pos then
-        insert_pos = i
-      end
-    end
-  end
-
-  if find_insert_pos then
-    return insert_pos
-  end
-  return nil
-end
-
---- Writes a local note to the user notes file.
----@param game_id string The game ID
----@param note CodeNote The note to write
----@return boolean True if successful
----@return string|nil Error message if failed
-function M._write_local_note(game_id, note)
-  local ok, err_or_path = M._ensure_user_file_exists(game_id)
-  if not ok then
-    return false, err_or_path
-  end
-
-  local path = err_or_path or ""
-  local lines = vim.fn.readfile(path)
-  local new_line = note:serialize()
-
-  local idx = M._find_line_idx_by_addr(lines, note.address)
-  if idx then
-    lines[idx] = new_line
-  else
-    local insert_pos = M._find_line_idx_by_addr(lines, note.address, { find_insert_pos = true }) or #lines + 1
-    table.insert(lines, insert_pos, new_line)
-  end
-
-  vim.fn.writefile(lines, path)
-  return true
-end
-
---- Deletes a local note by address.
----@param game_id string The game ID
----@param address number The note address to delete
----@return boolean True if successful
----@return string|nil Error message if failed
-function M.delete_local(game_id, address)
-  local ok, err_or_path = M._ensure_user_file_exists(game_id)
-  if not ok then
-    return false, err_or_path
-  end
-
-  local path = err_or_path or ""
-  local lines = vim.fn.readfile(path)
-  local idx = M._find_line_idx_by_addr(lines, address)
-  if idx then
-    table.remove(lines, idx)
-  end
-
-  vim.fn.writefile(lines, path)
-  return true
-end
-
 --- Exports a note to the local notes file.
 ---@param game_id string The game ID
 ---@param note CodeNote The note to export
 ---@return boolean True if successful
 ---@return string|nil Error message if failed
 function M.export(game_id, note)
-  return M._write_local_note(game_id, note)
+  local local_notes, load_err = LocalNotes.load(game_id)
+  if not local_notes then
+    return false, load_err
+  end
+
+  local_notes:update_or_add(note)
+  return local_notes:save()
 end
 
 --- Opens the notes picker with all notes (server and local).
@@ -311,7 +121,8 @@ function M.open_local(game_id)
     return
   end
 
-  local notes_list = M.load_from_local(resolved_game_id)
+  local local_notes_obj, _ = LocalNotes.load(resolved_game_id)
+  local notes_list = local_notes_obj and local_notes_obj.notes or {}
   require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
@@ -326,7 +137,8 @@ function M.open_server(game_id)
     return
   end
 
-  local notes_list = M.load_from_server(resolved_game_id)
+  local notes_obj, _ = ServerNotes.load(resolved_game_id)
+  local notes_list = notes_obj and notes_obj.notes or {}
   require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
@@ -376,7 +188,12 @@ function M.create_new_with_content(address, lines, game_id)
 
   local content = table.concat(lines, "\r\n")
   local note = LocalNote:new(address, content)
-  return M._write_local_note(resolved_game_id, note)
+  local local_notes, load_err = LocalNotes.load(resolved_game_id)
+  if not local_notes then
+    return false, load_err
+  end
+  local_notes:update_or_add(note)
+  return local_notes:save()
 end
 
 return M
