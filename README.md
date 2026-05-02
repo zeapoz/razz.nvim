@@ -78,7 +78,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
 | `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
-| `notes.publish()` | - | Publish local note to server |
+| `notes.publish()` | `address?`, `game_id?` | Publish local note to server |
 | `notes.publish_all()` | `game_id?` | Publish all local notes to the server sequentially |
 
 `<Enter>` opens the selected note. `<C-x>`/`<C-v>` opens in a split. Select multiple notes with `<Tab>`.

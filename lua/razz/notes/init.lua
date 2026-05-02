@@ -5,6 +5,7 @@
 local M = {}
 local storage = require("razz.storage")
 local razz = require("razz")
+local util = require("razz.util")
 local LocalNote = require("razz.notes.types.local")
 local LocalNotes = require("razz.notes.types.local_notes")
 local ServerNotes = require("razz.notes.types.server_notes")
@@ -181,6 +182,46 @@ function M.open_new(address, game_id)
       end
     end)
   end
+end
+
+--- Publishes a single local note to the server.
+--- If address is provided, publishes that specific note.
+--- Otherwise, falls back to publishing the current buffer's note.
+---@param address? number The note address (or nil to use buffer.publish)
+---@param game_id? string|number The game ID (required if address provided)
+function M.publish(address, game_id)
+  if address then
+    local resolved_game_id, err = razz.get_game_id_or_error(game_id)
+    if not resolved_game_id or err then
+      if err then
+        vim.notify(err, vim.log.levels.ERROR)
+      end
+      return
+    end
+
+    local local_notes_obj, load_err = LocalNotes.load(resolved_game_id)
+    if not local_notes_obj then
+      vim.notify("Failed to load local notes: " .. load_err, vim.log.levels.ERROR)
+      return
+    end
+
+    local note = local_notes_obj:find_by_addr(address)
+    if not note then
+      vim.notify("Local note not found at address: " .. util.format_hex_address(address), vim.log.levels.ERROR)
+      return
+    end
+
+    if not note.address or not note.content then
+      vim.notify("Note is missing address or content", vim.log.levels.ERROR)
+      return
+    end
+
+    local note_to_publish = LocalNote:new(note.address, note.content, resolved_game_id)
+    note_to_publish:publish()
+    return
+  end
+
+  require("razz.notes.buffer").publish()
 end
 
 --- Publishes all local notes to the server sequentially.
