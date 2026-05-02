@@ -1,6 +1,7 @@
 local constants = require("razz.constants")
 local storage = require("razz.storage")
 local LocalNote = require("razz.notes.types.local")
+local util = require("razz.util")
 
 ---@class LocalNotes
 ---@field game_id string
@@ -67,12 +68,7 @@ end
 ---@param address number The address to find
 ---@return LocalNote|nil The note, or nil if not found
 function LocalNotes:find_by_addr(address)
-  for _, note in ipairs(self.notes) do
-    if note.address == address then
-      return note
-    end
-  end
-  return nil
+  return util.find_by_address(self.notes, address)
 end
 
 --- Finds the line index for a given address in the notes file.

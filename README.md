@@ -72,9 +72,9 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 
 | Function | Options | Description |
 |----------|---------|-------------|
-| `notes.open()` | `game_id?` | Open all notes (server + local) |
-| `notes.open_local()` | `game_id?` | Open local notes only |
-| `notes.open_server()` | `game_id?` | Open server notes only |
+| `notes.open()` | `game_id?`, `address?` | Open all notes (server + local) |
+| `notes.open_local()` | `game_id?`, `address?` | Open local notes only |
+| `notes.open_server()` | `game_id?`, `address?` | Open server notes only |
 | `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
 | `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
@@ -94,8 +94,8 @@ The plugin detects the game ID in this order:
 To explicitly specify a game ID:
 
 ```lua
-notes.open(14426)
-notes.open_new(0x00001234, 14426)
+notes.open(20374)
+notes.open(20374, 0x00001234)
 ```
 
 ## License

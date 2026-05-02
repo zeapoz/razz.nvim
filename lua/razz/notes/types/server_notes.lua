@@ -1,6 +1,7 @@
 local constants = require("razz.constants")
 local storage = require("razz.storage")
 local ServerNote = require("razz.notes.types.server")
+local util = require("razz.util")
 
 ---@class ServerNotes
 ---@field game_id string
@@ -50,12 +51,7 @@ end
 ---@param address number The address to find
 ---@return ServerNote|nil The note, or nil if not found
 function ServerNotes:find_by_addr(address)
-  for _, note in ipairs(self.notes) do
-    if note.address == address then
-      return note
-    end
-  end
-  return nil
+  return util.find_by_address(self.notes, address)
 end
 
 --- Updates an existing note or adds a new one.

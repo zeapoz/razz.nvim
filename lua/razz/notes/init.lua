@@ -84,32 +84,28 @@ end
 ---@param game_id string The game ID
 ---@return CodeNote[] Array of all merged notes
 function M.get_all(game_id)
-  local server_notes_obj, _ = ServerNotes.load(game_id)
+  local server_notes_obj = ServerNotes.load(game_id)
+  local local_notes_obj = LocalNotes.load(game_id)
+
   local server_notes = server_notes_obj and server_notes_obj.notes or {}
-  local local_notes_obj, _ = LocalNotes.load(game_id)
   local local_notes = local_notes_obj and local_notes_obj.notes or {}
 
-  local local_by_addr = {}
-  for _, note in ipairs(local_notes) do
-    local_by_addr[note.address] = note
-  end
-
   local results = {}
-  local used_local = {}
+  local seen = {}
 
   for _, note in ipairs(server_notes) do
     local addr = note.address
-    if local_by_addr[addr] then
-      table.insert(results, local_by_addr[addr])
-      used_local[addr] = true
+    local local_note = util.find_by_address(local_notes, addr)
+    if local_note then
+      table.insert(results, local_note)
     else
       table.insert(results, note)
     end
+    seen[addr] = true
   end
 
   for _, note in ipairs(local_notes) do
-    local addr = note.address
-    if not used_local[addr] then
+    if not seen[note.address] then
       table.insert(results, note)
     end
   end
@@ -132,11 +128,23 @@ function M.export(game_id, note)
   return local_notes:save()
 end
 
---- Opens the notes picker with all notes (server and local).
+--- Opens a specific note or the notes picker with all notes (server and local).
 ---@param game_id? string|number The game ID (or nil to infer)
-function M.open(game_id)
+---@param address? number If provided, opens note at address directly (skips picker)
+function M.open(game_id, address)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
+    return
+  end
+
+  if address then
+    local notes_list = M.get_all(resolved_game_id)
+    local note = util.find_by_address(notes_list, address)
+    if note then
+      require("razz.notes.buffer").open_buffer(note)
+    else
+      vim.notify("No note found at address: " .. util.format_hex_address(address), vim.log.levels.WARN)
+    end
     return
   end
 
@@ -144,11 +152,23 @@ function M.open(game_id)
   require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
 end
 
---- Opens the notes picker with local notes only.
+--- Opens a specific local note or the notes picker with local notes only.
 ---@param game_id? string|number The game ID (or nil to infer)
-function M.open_local(game_id)
+---@param address? number If provided, opens note at address directly (skips picker)
+function M.open_local(game_id, address)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
+    return
+  end
+
+  if address then
+    local local_notes = LocalNotes.load(resolved_game_id)
+    local note = local_notes and local_notes:find_by_addr(address)
+    if note then
+      require("razz.notes.buffer").open_buffer(note)
+    else
+      vim.notify("No local note found at address: " .. util.format_hex_address(address), vim.log.levels.WARN)
+    end
     return
   end
 
@@ -156,11 +176,23 @@ function M.open_local(game_id)
   require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list or {} })
 end
 
---- Opens the notes picker with server notes only.
+--- Opens a specific server note or the notes picker with server notes only.
 ---@param game_id? string|number The game ID (or nil to infer)
-function M.open_server(game_id)
+---@param address? number If provided, opens note at address directly (skips picker)
+function M.open_server(game_id, address)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
+    return
+  end
+
+  if address then
+    local server_notes = ServerNotes.load(resolved_game_id)
+    local note = server_notes and server_notes:find_by_addr(address)
+    if note then
+      require("razz.notes.buffer").open_buffer(note)
+    else
+      vim.notify("No server note found at address: " .. util.format_hex_address(address), vim.log.levels.WARN)
+    end
     return
   end
 
