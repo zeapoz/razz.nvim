@@ -8,6 +8,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 
 - Browse local and server code notes
 - Publish local notes to the RetroAchievements server
+- Export RAScript files using `rascript-cli`
 - Telescope picker integration
 
 ## Prerequisites
@@ -43,13 +44,15 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
   end,
   keys = function()
     local notes = require("razz.notes")
+    local rascript = require("razz.rascript")
     return {
       { "<leader>co", function() notes.open() end, desc = "Open code note" },
       { "<leader>cl", function() notes.open_local() end, desc = "Open local note" },
       { "<leader>cs", function() notes.open_server() end, desc = "Open server note" },
-      { "<leader>cf", function() notes.fetch_server() end, desc = "Fetch server notes" },
       { "<leader>cn", function() notes.open_new() end, desc = "Open new note" },
+      { "<leader>cf", function() notes.fetch_server() end, desc = "Fetch server notes" },
       { "<leader>ca", function() notes.publish_all() end, desc = "Publish all local notes" },
+      { "<leader>ce", function() rascript.export() end, desc = "Export current RAScript file" },
     }
   end,
 }
@@ -61,8 +64,11 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 |--------|------|---------|-------------|
 | `emulator_dirs` | table | `{}` | Required. List of paths to emulator directories (containing `RACache/Data/`) |
 | `rascript_cli_bin` | string | `"rascript-cli"` | Path to the rascript-cli binary for managing RA scripts |
+| `keys` | table | See section below | Local buffer keymaps active in the code note editor |
 
 ### Buffer Local Keymaps
+
+These keymaps are active by default when editing code notes and can be configured via the `keys` option.
 
 | Keymap | Default | Description |
 |--------|---------|-------------|
@@ -76,9 +82,9 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.open()` | `game_id?`, `address?` | Open all notes (server + local) |
 | `notes.open_local()` | `game_id?`, `address?` | Open local notes only |
 | `notes.open_server()` | `game_id?`, `address?` | Open server notes only |
-| `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
 | `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
+| `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
 | `notes.publish()` | `address?`, `game_id?` | Publish local note to server |
 | `notes.publish_all()` | `game_id?` | Publish all local notes to the server sequentially |
 | `rascript.export` | `input_file?`, `output_dir?` | Export RAScript file to emulator data directory |
