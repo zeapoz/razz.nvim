@@ -168,8 +168,8 @@ function M.open_new(address, game_id)
   end
 
   local function do_create(addr)
-    local note = LocalNote:new(addr, "")
-    require("razz.notes.buffer").open_buffer(note, resolved_game_id, nil, true)
+    local note = LocalNote:new(addr, "", resolved_game_id)
+    require("razz.notes.buffer").open_buffer(note, nil, true)
   end
 
   if address then
@@ -220,9 +220,9 @@ function M.publish_all(game_id)
     end
 
     local note = notes[index]
-    local note_to_publish = LocalNote:new(note.address, note.content)
+    local note_to_publish = LocalNote:new(note.address, note.content, resolved_game_id)
 
-    note_to_publish:publish(resolved_game_id, nil)
+    note_to_publish:publish()
 
     vim.defer_fn(function()
       publish_next(index + 1)
@@ -247,7 +247,7 @@ function M.create_new(address, lines, game_id)
   end
 
   local content = table.concat(lines, "\r\n")
-  local note = LocalNote:new(address, content)
+  local note = LocalNote:new(address, content, resolved_game_id)
   local local_notes, load_err = LocalNotes.load(resolved_game_id)
   if not local_notes then
     return false, load_err

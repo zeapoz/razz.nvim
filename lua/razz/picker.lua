@@ -145,10 +145,10 @@ function M.show(opts)
           local selection_value = selection.value
           for _, entry in ipairs(selections) do
             if entry.value ~= selection_value then
-              notes_buffer.open_buffer(entry.value, game_id, prev_winnr, false)
+              notes_buffer.open_buffer(entry.value, prev_winnr, false)
             end
           end
-          notes_buffer.open_buffer(selection_value, game_id, prev_winnr, true)
+          notes_buffer.open_buffer(selection_value, prev_winnr, true)
         end
       end
 

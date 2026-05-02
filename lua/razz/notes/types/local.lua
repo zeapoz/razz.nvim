@@ -8,9 +8,10 @@ local LocalNote = setmetatable({}, { __index = CodeNote })
 
 ---@param address number The memory address
 ---@param content? string The note content
+---@param game_id string The game ID
 ---@return LocalNote
-function LocalNote:new(address, content)
-  local obj = CodeNote.new(self, address, content) --[[@as LocalNote]]
+function LocalNote:new(address, content, game_id)
+  local obj = CodeNote.new(self, address, content, game_id) --[[@as LocalNote]]
   return obj
 end
 
@@ -29,20 +30,21 @@ function LocalNote.from_buffer(buf)
   local lines = vim.api.nvim_buf_get_lines(target_buf, 0, -1, false)
   local content = table.concat(lines, "\r\n")
 
-  return LocalNote:new(note_addr, content)
+  return LocalNote:new(note_addr, content, game_id)
 end
 
 --- Parses a note from a serialized line.
 ---@param line string The line to parse
+---@param game_id string The game ID
 ---@return LocalNote? The parsed note, or nil if invalid
-function LocalNote.parse_line(line)
+function LocalNote.parse_line(line, game_id)
   local addr_str, content = line:match(constants.NOTE_LINE_WITH_CONTENT_PATTERN)
   if not addr_str then
     return nil
   end
   local addr = tonumber(addr_str, 16)
   local unescaped = CodeNote.unescaped(content)
-  return LocalNote:new(addr, unescaped)
+  return LocalNote:new(addr, unescaped, game_id)
 end
 
 --- Serializes the note to its string representation.
@@ -54,24 +56,12 @@ function LocalNote:serialize()
 end
 
 --- Publishes the note to the server.
----@param game_id? number|string The game ID (defaults to buffer's game_id)
----@param buf? number Buffer handle (defaults to current buffer)
 ---@return nil
-function LocalNote:publish(game_id, buf)
-  local target_buf = buf or vim.api.nvim_get_current_buf()
-  local resolved_game_id = game_id or vim.api.nvim_buf_get_var(target_buf, "game_id")
-  if not resolved_game_id then
-    vim.notify("Game ID not found", vim.log.levels.ERROR)
-    return
-  end
-
-  local note_addr = self.address
-  local note_content = self.content
-
-  ra_client.publish_note(resolved_game_id, note_addr, note_content, function()
+function LocalNote:publish()
+  ra_client.publish_note(self.game_id, self.address, self.content, function()
     vim.schedule(function()
       local notes = require("razz.notes")
-      local ok, err = notes.mark_synced(resolved_game_id, note_addr, note_content)
+      local ok, err = notes.mark_synced(self.game_id, self.address, self.content)
       if not ok then
         vim.notify("Failed to update synced note: " .. err, vim.log.levels.ERROR)
       end

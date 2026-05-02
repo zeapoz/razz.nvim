@@ -30,7 +30,7 @@ function LocalNotes.load(game_id)
 
   local notes = {}
   for i = constants.HEADER_LINE_COUNT, #lines do
-    local note = LocalNote.parse_line(lines[i])
+    local note = LocalNote.parse_line(lines[i], game_id)
     if note then
       table.insert(notes, note)
     end

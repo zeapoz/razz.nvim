@@ -8,27 +8,29 @@ local ServerNote = setmetatable({}, { __index = CodeNote })
 ---@param address number The memory address
 ---@param content? string The note content
 ---@param user string The username associated with the note (required)
+---@param game_id string The game ID
 ---@return ServerNote? The note instance on success
 ---@return string|nil Error message on failure
-function ServerNote:new(address, content, user)
+function ServerNote:new(address, content, user, game_id)
   if not user then
     return nil, "user is required"
   end
-  local obj = CodeNote.new(self, address, content) --[[@as ServerNote]]
+  local obj = CodeNote.new(self, address, content, game_id) --[[@as ServerNote]]
   obj.user = user
   return obj
 end
 
 --- Creates a note from server JSON data.
 ---@param json table The JSON object from the server
+---@param game_id string The game ID
 ---@return ServerNote? The note instance on success
 ---@return string|nil Error message on failure
-function ServerNote.parse_json(json)
+function ServerNote.parse_json(json, game_id)
   local addr = tonumber(json.Address, 16)
   if not addr then
     return nil, "invalid address: " .. tostring(json.Address)
   end
-  return ServerNote:new(addr, json.Note or "", json.User)
+  return ServerNote:new(addr, json.Note or "", json.User, game_id)
 end
 
 --- Serializes the note to JSON format.

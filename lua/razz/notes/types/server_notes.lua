@@ -30,7 +30,7 @@ function ServerNotes.load(game_id)
 
   local notes = {}
   for _, json_note in ipairs(json_notes) do
-    local note, err = ServerNote.parse_json(json_note)
+    local note, err = ServerNote.parse_json(json_note, game_id)
     if not note then
       vim.notify("Failed to parse note: " .. err, vim.log.levels.WARN)
     else
@@ -68,7 +68,7 @@ function ServerNotes:update_or_add(address, content, user)
     note.content = content
     note.user = user
   else
-    local new_note = ServerNote:new(address, content, user)
+    local new_note = ServerNote:new(address, content, user, self.game_id)
     table.insert(self.notes, new_note)
   end
 end
@@ -138,14 +138,14 @@ function ServerNotes.fetch_from_server(game_id)
   local ra_client = require("razz.ra_client")
 
   ra_client.fetch_notes(game_id, function(json_notes, err)
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
+    if err or not json_notes then
+      vim.notify(err or "invalid response", vim.log.levels.ERROR)
       return
     end
 
     local notes = {}
     for _, json_note in ipairs(json_notes) do
-      local note, note_err = ServerNote.parse_json(json_note)
+      local note, note_err = ServerNote.parse_json(json_note, game_id)
       if not note then
         vim.notify("Failed to parse note: " .. note_err, vim.log.levels.WARN)
       else

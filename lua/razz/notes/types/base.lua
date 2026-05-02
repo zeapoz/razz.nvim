@@ -4,15 +4,18 @@ local util = require("razz.util")
 ---@class CodeNote
 ---@field address number
 ---@field content string
+---@field game_id string
 local CodeNote = {}
 
 ---@param address number The memory address
 ---@param content? string The note content
+---@param game_id string The game ID
 ---@return CodeNote
-function CodeNote:new(address, content)
+function CodeNote:new(address, content, game_id)
   local obj = setmetatable({}, self)
   obj.address = address
   obj.content = content or ""
+  obj.game_id = game_id
   self.__index = self
   return obj
 end

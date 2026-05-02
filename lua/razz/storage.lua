@@ -121,8 +121,8 @@ function M.load_session()
     return
   end
 
-  local ok, session = pcall(vim.json.decode, table.concat(lines, ""))
-  if not ok then
+  local ok_decode, session = pcall(vim.json.decode, table.concat(lines, ""))
+  if not ok_decode then
     return
   end
 
