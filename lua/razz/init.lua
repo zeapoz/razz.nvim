@@ -1,6 +1,6 @@
 local M = {}
 local config = require("razz.config")
-local ra_client = require("razz.ra_client")
+local ra_client = require("razz.client")
 local storage = require("razz.storage")
 
 --- Ensures the plugin is properly configured.
@@ -29,7 +29,7 @@ function M.get_game_id_or_error(game_id)
   if buffer_game_id then
     return buffer_game_id
   end
-  local tools = require("razz.tools")
+  local tools = require("razz.rascript")
   return tools.try_infer_from_buffer()
 end
 
@@ -38,7 +38,13 @@ end
 ---@return table The module for chaining
 function M.setup(opts)
   opts = opts or {}
-  config.emulator_dirs = opts.emulator_dirs or {}
+  for key, value in pairs(opts) do
+    if key == "keys" and type(value) == "table" then
+      config.keys = vim.tbl_extend("force", config.keys, value)
+    else
+      config[key] = value
+    end
+  end
   return M
 end
 

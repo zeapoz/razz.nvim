@@ -12,7 +12,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 
 ## Prerequisites
 
-- Neovim 0.9+
+- Neovim 0.10+
 - [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
 
 ## Installation (lazy.nvim)
@@ -60,6 +60,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `emulator_dirs` | table | `{}` | Required. List of paths to emulator directories (containing `RACache/Data/`) |
+| `rascript_cli_bin` | string | `"rascript-cli"` | Path to the rascript-cli binary for managing RA scripts |
 
 ### Buffer Local Keymaps
 
@@ -80,6 +81,7 @@ A Neovim plugin for managing [RetroAchievements](https://retroachievements.org) 
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
 | `notes.publish()` | `address?`, `game_id?` | Publish local note to server |
 | `notes.publish_all()` | `game_id?` | Publish all local notes to the server sequentially |
+| `rascript.export` | `input_file?`, `output_dir?` | Export RAScript file to emulator data directory |
 
 `<Enter>` opens the selected note. `<C-x>`/`<C-v>` opens in a split. Select multiple notes with `<Tab>`.
 

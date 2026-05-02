@@ -58,12 +58,10 @@ local function _save_callback(buf, note)
   elseif server_note_content and current_content == server_note_content then
     local local_notes = LocalNotes.load(game_id)
     if local_notes then
-      local ok, err = local_notes:delete(note_addr)
+      local ok, _ = local_notes:delete(note_addr)
       if ok then
         vim.notify("Note matches server, removed local: " .. note:format_address())
         _update_buf_name(buf, note)
-      else
-        vim.notify("Failed to remove local: " .. err, vim.log.levels.ERROR)
       end
     end
   else

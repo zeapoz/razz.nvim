@@ -1,6 +1,6 @@
 local CodeNote = require("razz.notes.types.base")
 local constants = require("razz.constants")
-local ra_client = require("razz.ra_client")
+local ra_client = require("razz.client")
 
 --- Local user notes.
 ---@class LocalNote: CodeNote

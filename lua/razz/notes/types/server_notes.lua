@@ -131,9 +131,9 @@ end
 --- Downloads server notes from the server.
 ---@param game_id string
 function ServerNotes.fetch_from_server(game_id)
-  local ra_client = require("razz.ra_client")
+  local client = require("razz.client")
 
-  ra_client.fetch_notes(game_id, function(json_notes, err)
+  client.fetch_notes(game_id, function(json_notes, err)
     if err or not json_notes then
       vim.notify(err or "invalid response", vim.log.levels.ERROR)
       return

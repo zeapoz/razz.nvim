@@ -1,5 +1,9 @@
----@module "razz.tools"
+---@module "razz.rascript"
 local M = {}
+local cli = require("razz.rascript.cli")
+
+M.export = cli.export
+M.export_current_file = cli.export_current_file
 
 --- Tries to infer the game ID from a buffer's content.
 --- Scans for "#ID = XXX" pattern in the first two lines.
