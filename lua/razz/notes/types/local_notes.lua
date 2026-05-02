@@ -21,12 +21,12 @@ function LocalNotes.load(game_id)
 
   local readable = vim.fn.filereadable(user_file)
   if readable == 0 then
-    return nil, "file not found: " .. user_file
+    return nil, "file not found"
   end
 
   local ok, lines = pcall(vim.fn.readfile, user_file)
   if not ok then
-    return nil, "failed to read file: " .. user_file
+    return nil, "failed to read file"
   end
 
   local notes = {}
@@ -58,7 +58,7 @@ function LocalNotes._ensure_file_exists(game_id)
 
   local readable = vim.fn.filereadable(user_file)
   if readable == 0 then
-    return nil, "file not found: " .. user_file
+    return nil, "file not found"
   end
 
   return user_file, nil
@@ -68,7 +68,7 @@ end
 ---@param address number The address to find
 ---@return LocalNote|nil The note, or nil if not found
 function LocalNotes:find_by_addr(address)
-  return util.find_by_address(self.notes, address)
+  return util.find_by_address(self.notes, address) --[[@as LocalNote|nil]]
 end
 
 --- Finds the line index for a given address in the notes file.

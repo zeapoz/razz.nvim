@@ -1,5 +1,6 @@
 ---@class razz.constants
 ---@field RACACHE_DATA_DIR string RACache Data directory path
+---@field DATA_FILE_SUFFIX string Default data file suffix
 ---@field SERVER_NOTES_SUFFIX string Server notes file suffix
 ---@field USER_NOTES_SUFFIX string User notes file suffix
 ---@field NOTE_LINE_PATTERN string Regex pattern for note lines
@@ -9,6 +10,7 @@
 ---@field ADDRESS_FORMAT string Format string for address formatting
 local M = {
   RACACHE_DATA_DIR = "RACache/Data/",
+  DATA_FILE_SUFFIX = ".json",
   SERVER_NOTES_SUFFIX = "-Notes.json",
   USER_NOTES_SUFFIX = "-User.txt",
   NOTE_LINE_PATTERN = "^N0:(0x[%x]+):(.*)",

@@ -39,10 +39,7 @@ function ServerNotes.load(game_id)
     end
   end
 
-  local self = setmetatable({
-    game_id = game_id,
-    notes = notes,
-  }, { __index = ServerNotes })
+  local self = setmetatable({ game_id = game_id, notes = notes }, { __index = ServerNotes })
 
   return self, nil
 end
@@ -51,7 +48,7 @@ end
 ---@param address number The address to find
 ---@return ServerNote|nil The note, or nil if not found
 function ServerNotes:find_by_addr(address)
-  return util.find_by_address(self.notes, address)
+  return util.find_by_address(self.notes, address) --[[@as ServerNote|nil]]
 end
 
 --- Updates an existing note or adds a new one.
@@ -62,15 +59,29 @@ function ServerNotes:update_or_add(address, content, user)
   local note = self:find_by_addr(address)
   if note then
     note.content = content
-    note.user = user
+    note.modified = os.time()
   else
-    local new_note = ServerNote:new(address, content, user, self.game_id)
+    local new_note = ServerNote:new(address, content, self.game_id)
+    new_note.modified = os.time()
+    new_note.author = user
     table.insert(self.notes, new_note)
   end
 end
 
---- Serializes all notes to JSON format.
----@return table[] Array of JSON-serializable tables
+--- Deletes a note by address.
+---@param address number The address to delete
+function ServerNotes:delete(address)
+  for i, note in ipairs(self.notes) do
+    if note.address == address then
+      table.remove(self.notes, i)
+      return true
+    end
+  end
+  return false
+end
+
+--- Serializes notes to JSON.
+---@return table The JSON-serializable table
 function ServerNotes:serialize_json()
   local json_notes = {}
   for _, note in ipairs(self.notes) do
@@ -82,7 +93,8 @@ end
 --- Saves notes to file asynchronously.
 ---@param callback fun(success: boolean, err: string|nil)
 function ServerNotes:save_async(callback)
-  storage.pick_data_path(self.game_id, constants.SERVER_NOTES_SUFFIX, function(data_path, path_err)
+  vim.schedule(function()
+    local data_path, path_err = storage.get_data_path(self.game_id, constants.SERVER_NOTES_SUFFIX)
     if not data_path then
       callback(false, path_err)
       return
@@ -97,7 +109,7 @@ function ServerNotes:save_async(callback)
 
     local ok_write = pcall(vim.fn.writefile, vim.split(json_str, "\n"), data_path)
     if not ok_write then
-      callback(false, "failed to write server notes")
+      callback(false, "failed to write server notes: " .. data_path)
       return
     end
 
@@ -122,7 +134,7 @@ function ServerNotes:save()
 
   local ok_write = pcall(vim.fn.writefile, vim.split(json_str, "\n"), data_path)
   if not ok_write then
-    return false, "failed to write server notes"
+    return false, "failed to write server notes: " .. data_path
   end
 
   return true, nil
@@ -154,6 +166,7 @@ function ServerNotes.fetch_from_server(game_id)
     self:save_async(function(ok, save_err)
       if not ok then
         vim.notify("Failed to save: " .. save_err, vim.log.levels.WARN)
+        return
       end
       vim.notify("Fetched " .. #notes .. " notes", vim.log.levels.INFO)
     end)

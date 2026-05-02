@@ -3,16 +3,6 @@ local config = require("razz.config")
 local ra_client = require("razz.client")
 local storage = require("razz.storage")
 
---- Ensures the plugin is properly configured.
----@return boolean success Whether configuration is valid
----@return string|nil err Error message if not configured
-function M.ensure_configured()
-  if #config.emulator_dirs == 0 then
-    return false, "no emulator_dirs configured"
-  end
-  return true, nil
-end
-
 --- Gets the game ID from options or infers from the current buffer.
 ---@param game_id? string|number The game ID (string, number, or nil to infer)
 ---@return string|nil The game ID, or nil if not found

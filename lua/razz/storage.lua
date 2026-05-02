@@ -3,14 +3,14 @@ local M = {}
 local constants = require("razz.constants")
 local config = require("razz.config")
 
---- Gets the first configured emulator directory.
----@return string|nil The first emulator directory
+--- Checks if emulator_dirs is configured.
+---@return boolean True if configured, false otherwise
 ---@return string|nil Error message if not configured
-local function get_first_emulator_dir()
+function M.ensure_configured()
   if #config.emulator_dirs == 0 then
-    return nil, "no emulator_dirs configured"
+    return false, "no emulator_dirs configured"
   end
-  return config.emulator_dirs[1]
+  return true, nil
 end
 
 --- Expands a directory path and appends the RACache Data subdirectory.
@@ -20,112 +20,51 @@ function M.expand_data_dir(dir)
   return vim.fn.expand(dir) .. "/" .. constants.RACACHE_DATA_DIR
 end
 
---- Gets the data directory from the first configured emulator.
----@return string|nil The data directory path, or nil if not configured
----@return string|nil Error message if not configured
-function M.get_data_dir()
-  local dir, err = get_first_emulator_dir()
+--- Gets the data directory.
+---@param game_id string The game ID (required)
+---@param suffix? string File suffix to search for (default: ".json")
+---@return string|nil The directory path, or nil if file not found
+---@return string|nil Error message if game_id not provided or file not found
+function M.get_data_dir(game_id, suffix)
+  local dir, err = M.get_emulation_dir(game_id, suffix)
   if not dir then
     return nil, err
   end
-  return M.expand_data_dir(dir)
+  return M.expand_data_dir(dir), nil
 end
 
---- Gets the emulation directory (parent of RACache/Data) from the first configured emulator.
----@return string|nil The emulation directory path, or nil if not configured
----@return string|nil Error message if not configured
-function M.get_emulation_dir()
-  local dir, err = get_first_emulator_dir()
-  if not dir then
-    return nil, err
+--- Gets the emulation directory.
+---@param game_id string The game ID (required)
+---@param suffix? string File suffix to search for (default: ".json")
+---@return string|nil The directory path, or nil if not found
+---@return string|nil Error message if game_id not provided or file not found
+function M.get_emulation_dir(game_id, suffix)
+  suffix = suffix or constants.DATA_FILE_SUFFIX
+  if not game_id then
+    return nil, "game_id required"
   end
-  return vim.fn.expand(dir)
-end
 
---- Gets the full data path for a game ID and file suffix.
---- Searches all emulator directories and returns the first file that exists.
----@param game_id string The game ID
----@param suffix string The file suffix (e.g., "-Notes.json")
----@return string|nil The full path if successful, or nil if not configured
----@return string|nil Error message if not configured
-function M.get_data_path(game_id, suffix)
-  local _, err = get_first_emulator_dir()
-  if err then
-    return nil, "no emulator_dirs configured"
-  end
   for _, dir in ipairs(config.emulator_dirs) do
     local full_path = M.expand_data_dir(dir) .. game_id .. suffix
     if vim.fn.filereadable(full_path) ~= 0 then
-      return full_path, nil
+      return vim.fn.expand(dir), nil
     end
   end
-  return nil, "file not found in any configured emulator directory"
+
+  return nil, "could not determine emulator directory"
 end
 
---- Prompts user to choose a directory for a new file.
---- Checks for existing file first - if found, returns that path. Otherwise prompts user.
+--- Gets the full data path for a game ID and file suffix.
 ---@param game_id string The game ID
----@param suffix string The file suffix
----@param callback fun(path: string|nil, err: string|nil)
-function M.pick_data_path(game_id, suffix, callback)
-  vim.schedule(function()
-    local existing_path, _ = M.get_data_path(game_id, suffix)
-    if existing_path then
-      callback(existing_path, nil)
-      return
-    end
-
-    local _, err = get_first_emulator_dir()
-    if err then
-      callback(nil, "no emulator_dirs configured")
-      return
-    end
-
-    local paths = {}
-    for _, dir in ipairs(config.emulator_dirs) do
-      local expanded = M.expand_data_dir(dir)
-      table.insert(paths, { dir = dir, path = expanded .. game_id .. suffix })
-    end
-
-    local choices = {}
-    for _, p in ipairs(paths) do
-      table.insert(choices, p.dir)
-    end
-
-    vim.ui.select(choices, {
-      prompt = "Choose directory for new file:",
-      format_item = function(item)
-        return item
-      end,
-    }, function(choice)
-      if not choice then
-        callback(nil, "cancelled")
-        return
-      end
-
-      for _, p in ipairs(paths) do
-        if p.dir == choice then
-          local ok_mkdir = pcall(vim.fn.mkdir, vim.fn.fnamemodify(p.path, ":p:h"), "p")
-          if not ok_mkdir then
-            callback(nil, "failed to create directory")
-            return
-          end
-          callback(p.path, nil)
-          return
-        end
-      end
-    end)
-  end)
-end
-
---- Gets all expanded data directories from config.
----@return string[] Array of expanded data directory paths
-function M.get_data_paths()
-  local paths = {}
-  for _, dir in ipairs(config.emulator_dirs) do
-    table.insert(paths, M.expand_data_dir(dir))
+---@param suffix string The file suffix (e.g., "-Notes.json")
+---@return string|nil The full path, or nil if not found
+---@return string|nil Error message if not found
+function M.get_data_path(game_id, suffix)
+  local dir, err = M.get_data_dir(game_id, suffix)
+  if not dir then
+    return nil, err
   end
-  return paths
+  return dir .. game_id .. suffix, nil
 end
 
 local _session_token = nil

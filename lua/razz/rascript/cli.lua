@@ -1,13 +1,13 @@
 local config = require("razz.config")
+local razz = require("razz")
 local storage = require("razz.storage")
 
 local M = {}
 
 --- Runs a rascript-cli command asynchronously.
 ---@param cmd string[] Command arguments
----@param on_done fun() Callback when command completes with no output
 ---@return nil
-local function run_command(cmd, on_done)
+local function run_command(cmd)
   local cli_path = vim.fn.expand(config.rascript_cli_bin)
   if vim.fn.executable(cli_path) == 0 then
     vim.notify("Could not find rascript-cli binary at: " .. cli_path, vim.log.levels.ERROR)
@@ -15,12 +15,11 @@ local function run_command(cmd, on_done)
   end
 
   vim.system({ cli_path, unpack(cmd) }, { text = true }, function(result)
-    if result.code ~= 0 and result.stderr ~= "" then
+    if result.stderr ~= "" then
       vim.notify(result.stderr, vim.log.levels.ERROR)
-    elseif result.stdout ~= "" then
+    end
+    if result.stdout ~= "" then
       vim.notify(result.stdout, vim.log.levels.INFO)
-    else
-      on_done()
     end
   end)
 end
@@ -73,17 +72,19 @@ end
 function M.do_export(input_file, output_dir)
   local emulation_dir = output_dir
   if not emulation_dir then
-    local dir, err = storage.get_emulation_dir()
+    local game_id = razz.get_game_id_or_error()
+    local dir, err = storage.get_emulation_dir(game_id)
     if not dir then
-      vim.notify("Could not determine emulator directory: " .. err, vim.log.levels.ERROR)
+      if err == "cancelled" then
+        return
+      end
+      vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
       return
     end
     emulation_dir = dir
   end
 
-  run_command({ "-i", input_file, "-o", emulation_dir }, function()
-    vim.notify("Export completed successfully", vim.log.levels.INFO)
-  end)
+  run_command({ "-i", input_file, "-o", emulation_dir })
 end
 
 return M

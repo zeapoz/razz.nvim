@@ -189,6 +189,7 @@ end
 function M.revert(buf, note)
   local note_addr = note.address
   local game_id = note.game_id
+
   local server_notes, load_err = ServerNotes.load(game_id)
   if not server_notes then
     vim.notify("Failed to load server notes: " .. load_err, vim.log.levels.ERROR)
