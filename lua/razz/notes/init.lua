@@ -10,6 +10,43 @@ local LocalNote = require("razz.notes.types.local")
 local LocalNotes = require("razz.notes.types.local_notes")
 local ServerNotes = require("razz.notes.types.server_notes")
 
+--- Resolves a game ID from input or infers from current buffer.
+---@param game_id? string|number The game ID (or nil to infer)
+---@return string|nil The resolved game ID, or nil on failure
+local function resolve_game_id(game_id)
+  local id, err = razz.get_game_id_or_error(game_id)
+  if not id then
+    if err then
+      vim.notify(err, vim.log.levels.ERROR)
+    end
+  end
+  return id
+end
+
+--- Loads local notes for a game.
+---@param game_id string The game ID
+---@return LocalNote[]|nil The notes array, or nil if not found
+---@return string|nil Error message if failed
+local function load_local_notes(game_id)
+  local notes_obj, load_err = LocalNotes.load(game_id)
+  if not notes_obj then
+    return nil, load_err
+  end
+  return notes_obj.notes
+end
+
+--- Loads server notes for a game.
+---@param game_id string The game ID
+---@return LocalNote[]|nil The notes array, or nil if not found
+---@return string|nil Error message if failed
+local function load_server_notes(game_id)
+  local notes_obj, load_err = ServerNotes.load(game_id)
+  if not notes_obj then
+    return nil, load_err
+  end
+  return notes_obj.notes
+end
+
 --- Marks a note as synced by updating server JSON and removing local note.
 ---@param game_id string The game ID
 ---@param address number The note address
@@ -98,11 +135,8 @@ end
 --- Opens the notes picker with all notes (server and local).
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.open(game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
@@ -113,43 +147,32 @@ end
 --- Opens the notes picker with local notes only.
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.open_local(game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
-  local local_notes_obj, _ = LocalNotes.load(resolved_game_id)
-  local notes_list = local_notes_obj and local_notes_obj.notes or {}
-  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
+  local notes_list = load_local_notes(resolved_game_id)
+  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list or {} })
 end
 
 --- Opens the notes picker with server notes only.
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.open_server(game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
-  local notes_obj, _ = ServerNotes.load(resolved_game_id)
-  local notes_list = notes_obj and notes_obj.notes or {}
-  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list })
+  local notes_list = load_server_notes(resolved_game_id)
+  require("razz.picker").open({ game_id = resolved_game_id, notes = notes_list or {} })
 end
 
 --- Fetches server notes from the server.
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.fetch_server(game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
@@ -160,11 +183,8 @@ end
 ---@param address? number Optional address to create note at
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.open_new(address, game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
@@ -191,21 +211,24 @@ end
 ---@param game_id? string|number The game ID (required if address provided)
 function M.publish(address, game_id)
   if address then
-    local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-    if not resolved_game_id or err then
-      if err then
-        vim.notify(err, vim.log.levels.ERROR)
+    local resolved_game_id = resolve_game_id(game_id)
+    if not resolved_game_id then
+      return
+    end
+
+    local local_notes = load_local_notes(resolved_game_id)
+    if not local_notes then
+      vim.notify("Failed to load local notes", vim.log.levels.ERROR)
+      return
+    end
+
+    local note
+    for _, n in ipairs(local_notes) do
+      if n.address == address then
+        note = n
+        break
       end
-      return
     end
-
-    local local_notes_obj, load_err = LocalNotes.load(resolved_game_id)
-    if not local_notes_obj then
-      vim.notify("Failed to load local notes: " .. load_err, vim.log.levels.ERROR)
-      return
-    end
-
-    local note = local_notes_obj:find_by_addr(address)
     if not note then
       vim.notify("Local note not found at address: " .. util.format_hex_address(address), vim.log.levels.ERROR)
       return
@@ -227,22 +250,18 @@ end
 --- Publishes all local notes to the server sequentially.
 ---@param game_id? string|number The game ID (or nil to infer)
 function M.publish_all(game_id)
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    if err then
-      vim.notify(err, vim.log.levels.ERROR)
-    end
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
     return
   end
 
-  local local_notes_obj, load_err = LocalNotes.load(resolved_game_id)
-  if not local_notes_obj then
-    vim.notify("Failed to load local notes: " .. load_err, vim.log.levels.ERROR)
+  local local_notes = load_local_notes(resolved_game_id)
+  if not local_notes then
+    vim.notify("Failed to load local notes", vim.log.levels.ERROR)
     return
   end
 
-  local notes = local_notes_obj.notes
-  local count = #notes
+  local count = #local_notes
   if count == 0 then
     vim.notify("No local notes to publish", vim.log.levels.WARN)
     return
@@ -260,7 +279,7 @@ function M.publish_all(game_id)
       return
     end
 
-    local note = notes[index]
+    local note = local_notes[index]
     local note_to_publish = LocalNote:new(note.address, note.content, resolved_game_id)
 
     note_to_publish:publish()
@@ -282,9 +301,9 @@ end
 function M.create_new(address, lines, game_id)
   lines = lines or {}
 
-  local resolved_game_id, err = razz.get_game_id_or_error(game_id)
-  if not resolved_game_id or err then
-    return false, err or "invalid game_id"
+  local resolved_game_id = resolve_game_id(game_id)
+  if not resolved_game_id then
+    return false, "invalid game_id"
   end
 
   local content = table.concat(lines, "\r\n")
