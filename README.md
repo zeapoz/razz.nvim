@@ -79,9 +79,9 @@ These keymaps are active by default when editing code notes and can be configure
 
 | Function | Options | Description |
 |----------|---------|-------------|
-| `notes.open()` | `game_id?`, `address?` | Open all notes (server + local) |
-| `notes.open_local()` | `game_id?`, `address?` | Open local notes only |
-| `notes.open_server()` | `game_id?`, `address?` | Open server notes only |
+| `notes.open()` | `address?`, `game_id?` | Open all notes (server + local) |
+| `notes.open_local()` | `address?`, `game_id?` | Open local notes only |
+| `notes.open_server()` | `address?`, `game_id?` | Open server notes only |
 | `notes.open_new()` | `address?`, `game_id?` | Open new note buffer |
 | `notes.create_new()` | `address`, `lines`, `game_id?` | Create note with content |
 | `notes.fetch_server()` | `game_id?` | Fetch server notes from RA and save to disk |
@@ -99,11 +99,11 @@ The plugin detects the game ID in this order:
 2. Buffer variable: `vim.b.game_id` set on the buffer (e.g., when editing notes)
 3. Infer from buffer: Scan for `#ID = XXX` in RAScript file header
 
-To explicitly specify a game ID:
+To explicitly specify an address and game ID:
 
 ```lua
-notes.open(20374)
-notes.open(20374, 0x00001234)
+notes.open(0x00001234)
+notes.open(0x00001234, 20374)
 ```
 
 ## License

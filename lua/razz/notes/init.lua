@@ -129,9 +129,9 @@ function M.export(game_id, note)
 end
 
 --- Opens a specific note or the notes picker with all notes (server and local).
----@param game_id? string|number The game ID (or nil to infer)
 ---@param address? number If provided, opens note at address directly (skips picker)
-function M.open(game_id, address)
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open(address, game_id)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
     return
@@ -153,9 +153,9 @@ function M.open(game_id, address)
 end
 
 --- Opens a specific local note or the notes picker with local notes only.
----@param game_id? string|number The game ID (or nil to infer)
 ---@param address? number If provided, opens note at address directly (skips picker)
-function M.open_local(game_id, address)
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open_local(address, game_id)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
     return
@@ -177,9 +177,9 @@ function M.open_local(game_id, address)
 end
 
 --- Opens a specific server note or the notes picker with server notes only.
----@param game_id? string|number The game ID (or nil to infer)
 ---@param address? number If provided, opens note at address directly (skips picker)
-function M.open_server(game_id, address)
+---@param game_id? string|number The game ID (or nil to infer)
+function M.open_server(address, game_id)
   local resolved_game_id = resolve_game_id(game_id)
   if not resolved_game_id then
     return
